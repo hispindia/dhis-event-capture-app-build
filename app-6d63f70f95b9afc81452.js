@@ -1231,7 +1231,7 @@
 	                        if (att) {
 	                            var attMaxDate = att.allowFutureDate ? '' : 0;
 	                            var isTrackerAssociate = att.valueType === 'TRACKER_ASSOCIATE';
-	                            var requiredInputField = 'attributeIsRequired('+att+')';
+	                            var requiredInputField = 'attributeIsRequired('+att.id+','+att.mandatory+')';
 	                            var disableInputField = 'attributeFieldDisabled(attributesById.'+attId+')';
 	                            var commonInputFieldProperty = ' name="' + fieldName + '"' +
 	                                ' element-id="' + i + '"' +
@@ -2264,7 +2264,7 @@
 	            variables = pushVariable(variables, 'due_date', executingEvent.dueDate, null, 'DATE', true, 'V', '' );
 	            variables = pushVariable(variables, 'event_count', evs ? evs.all.length : 0, null, 'INTEGER', true, 'V', '', false );
 	
-	            variables = pushVariable(variables, 'enrollment_date', selectedEnrollment ? selectedEnrollment.enrollmentDate : '', null, 'DATE', selectedEnrollment ? true : false, 'V', '', false );
+	            variables = pushVariable(variables, 'enrollment_date', selectedEnrollment ? selectedEnrollment.enrollmentDate : '', null, 'DATE', selectedEnrollment ? selectedEnrollment.enrollmentDate ? true : false : false, 'V', '', false );
 	            variables = pushVariable(variables, 'enrollment_id', selectedEnrollment ? selectedEnrollment.enrollment : '', null, 'TEXT',  selectedEnrollment ? true : false, 'V', '', false );
 	            variables = pushVariable(variables, 'event_id', executingEvent ? executingEvent.event : '', null, 'TEXT',  executingEvent ? true : false, 'V', executingEvent ? executingEvent.eventDate : false, false);
 	
@@ -2432,7 +2432,7 @@
 	                var brokenExecution = false;
 	                angular.forEach(dhisFunctions, function(dhisFunction){
 	                    //Select the function call, with any number of parameters inside single quotations, or number parameters witout quotations
-	                    var regularExFunctionCall = new RegExp(dhisFunction.name + "\\( *(([\\d/\\*\\+\\-%\.]+)|( *'[^']*'))*( *, *(([\\d/\\*\\+\\-%\.]+)|'[^']*'))* *\\)",'g');
+	                    var regularExFunctionCall = new RegExp(dhisFunction.name + "\\( *(([\\d/\\*\\+\\-%\. ]+)|( *'[^']*'))*( *, *(([\\d/\\*\\+\\-%\. ]+)|'[^']*'))* *\\)",'g');
 	                    var callsToThisFunction = expression.match(regularExFunctionCall);
 	                    angular.forEach(callsToThisFunction, function(callToThisFunction){
 	                        //Remove the function name and paranthesis:
@@ -3111,6 +3111,8 @@
 	                            if(angular.isUndefined( $rootScope.ruleeffects[ruleEffectKey][action.id] )){
 	                                $rootScope.ruleeffects[ruleEffectKey][action.id] =  {
 	                                    id:action.id,
+	                                    option:action.option,
+	                                    optionGroup:action.optionGroup,
 	                                    location:action.location,
 	                                    action:action.programRuleActionType,
 	                                    dataElement:action.dataElement,
@@ -3880,7 +3882,7 @@
 	    return {
 	        getChildren: function(uid){
 	            if( orgUnit !== uid ){
-	                orgUnitPromise = $http.get( DHIS2URL + '/organisationUnits/'+ uid + '.json?fields=id,path,level,children[id,displayName,level,children[id]]&paging=false' ).then(function(response){
+	                orgUnitPromise = $http.get( DHIS2URL + '/organisationUnits/'+ uid + '.json?fields=id,path,programs[id],level,children[id,displayName,programs[id],level,children[id]]&paging=false' ).then(function(response){
 	                    orgUnit = uid;
 	                    return response.data;
 	                });
@@ -3889,7 +3891,7 @@
 	        },
 	        get: function(uid){
 	            if( orgUnit !== uid ){
-	                orgUnitPromise = $http.get( DHIS2URL + '/organisationUnits/'+ uid + '.json?fields=id,displayName,level,path' ).then(function(response){
+	                orgUnitPromise = $http.get( DHIS2URL + '/organisationUnits/'+ uid + '.json?fields=id,displayName,programs[id],level,path' ).then(function(response){
 	                    orgUnit = uid;
 	                    return response.data;
 	                });
@@ -3929,7 +3931,7 @@
 	                def.resolve( ous );
 	            }
 	            else{
-	                var url = DHIS2URL + '/me.json?fields=organisationUnits[id,displayName,level,path,children[id,displayName,level,children[id]]],teiSearchOrganisationUnits[id,displayName,level,path,children[id,displayName,level,children[id]]]&paging=false';
+	                var url = DHIS2URL + '/me.json?fields=organisationUnits[id,displayName,programs[id],level,path,children[id,displayName,programs[id],level,children[id]]],teiSearchOrganisationUnits[id,displayName,programs[id],level,path,children[id,displayName,programs[id],level,children[id]]]&paging=false';
 	                $http.get( url ).then(function(response){
 	                    response.data.organisationUnits = response.data.teiSearchOrganisationUnits && response.data.teiSearchOrganisationUnits.length > 0 ? response.data.teiSearchOrganisationUnits : response.data.organisationUnits;
 	                    delete response.data.teiSearchOrganisationUnits;
@@ -4895,7 +4897,8 @@
 	            customOnClick: '&dhClick',
 	            currentElement: '=dhCurrentElement',
 	            event: '=dhEvent',
-	            id: '=dhId'
+	            id: '=dhId',
+	            field: '=dhField'
 	        },
 	        controller: [
 	            '$scope',
@@ -4910,10 +4913,15 @@
 	
 	                $scope.valueClicked = function (buttonValue){
 	
+	                    if($scope.field) {
+	                        $scope.field.$setDirty();
+	                    }
+	
 	                    $scope.clickedButton = buttonValue;
 	
 	                    var originalValue = $scope.value;
 	                    var tempValue = buttonValue;
+	
 	                    if($scope.value === buttonValue){
 	                        tempValue = "";
 	                    }
@@ -5840,10 +5848,15 @@
 	            
 	            $scope.age = {};
 	            
-	            if( $scope.id && $scope.d2Object && $scope.d2Object[$scope.id] ){
-	                $scope.age.dob = $scope.d2Object[$scope.id];
-	                formatAge();
+	            var setDate = function(){
+	                if( $scope.id && $scope.d2Object && $scope.d2Object[$scope.id] ){
+	                    $scope.age.dob = $scope.d2Object[$scope.id];
+	                    formatAge();
+	                }
 	            }
+	
+	            setDate();
+	
 	            
 	            function formatAge(){
 	                if( $scope.age && $scope.age.dob !== "" ){
@@ -5862,7 +5875,15 @@
 	                    }
 	                }
 	            });
-	            
+	
+	            //In cases where the value is assigned with a program rule we need to set model.radio so that the UI updates.
+	            $scope.$watch('d2Object[id]',function(newValue, oldValue){
+	                if( newValue !== oldValue ){
+	                    $scope.age = {};
+	                    setDate();
+	                }        
+	            });
+	
 	            $scope.saveDOB = function(){                
 	                formatAge();                
 	            };
@@ -7322,8 +7343,8 @@
 	$templateCache.put('./templates/custom-registration-form.html','<d2-custom-registration-form custom-registration-form="customRegistrationForm"></d2-custom-registration-form>');
 	$templateCache.put('./templates/date-time-input.html','<div class="hideInPrint input-group" ng-init="dateTimeInit()">\n        <input type="text"\n               ng-attr-placeholder="{{datetimeDatePlaceholder}}"\n               class="form-control no-right-radius ng-valid-date-validator"\n               ng-class="datetimeUseNotification ? getInputNotifcationClass(datetimeModelId, datetimeModel) : \'\'"\n               d2-date\n               d2-date-validator\n               max-date="datetimeMaxDate"\n               ng-model="dateTime.date"\n               ng-required="datetimeRequired"\n               ng-disabled="datetimeDisabled"\n               blur-or-change="saveDateTime(true, \'foo\')"\n               name="foo">\n        <span class="input-group-btn empty-span"></span>\n        <input type="text"\n               ng-attr-placeholder="{{\'hours_and_minutes\' | translate}}"\n               class="form-control no-left-radius no-right-radius"\n               ng-class="datetimeUseNotification ? getInputNotifcationClass(datetimeModelId, datetimeModel) : \'\'"\n               d2-time-validator\n               d2-time-parser\n               ng-model="dateTime.time"\n               ng-required="datetimeRequired"\n               ng-disabled="datetimeDisabled"\n               ng-change="autoTimeFormat()"\n               ng-blur="saveDateTime(false, \'foo2\')"\n               name="foo2">\n        <span class="input-group-btn hideInPrint">\n            <button class="btn btn-danger hideInPrint trim" type="button" ng-disabled="datetimeDisabled" ng-attr-title="Clear" ng-click="clearDateTime()"> \n                <i class="fa fa-trash-o"></i>                             \n            </button>\n        </span>\n</div>\n\n<div class="not-for-screen">\n    <input type="text" class="form-control" ng-attr-value={{datetimeModel[datetimeModelId]}}>\n</div>\n\n<div ng-messages="datetimeField.foo2.$error" ng-if="interacted(datetimeField.foo2, datetimeOuterform)" class="required">\n    <span ng-message="timeValidator">{{\'time_error\' | translate}}</span>\n</div>');
 	$templateCache.put('./templates/error-messages.html','<span ng-message="required">{{\'required\' | translate}}</span>\n<span ng-message="number">{{\'value_must_be_number\' | translate}}</span>\n<span ng-message="percentValue">{{\'value_must_be_valid_percentValue\' | translate}}</span>\n<span ng-message="posInt">{{\'value_must_be_posInt\' | translate}}</span>\n<span ng-message="negInt">{{\'value_must_be_negInt\' | translate}}</span>\n<span ng-message="zeroPositiveInt">{{\'value_must_be_zeroPositiveInt\' | translate}}</span>\n<span ng-message="integer">{{\'value_must_be_int\' | translate}}</span>\n<span ng-message="dateValidator">{{\'date_required\' | translate}} ({{dhis2CalendarFormat.keyDateFormat}})</span>\n<span ng-message="futureDateValidator">{{\'future_date_not_allowed\' | translate}}</span>\n<span ng-message="timeValidator">{{\'wrong_time_format\' | translate}}</span>\n<span ng-message="optionValidator">{{\'option_required\' | translate}}</span>\n<span ng-message="latitudeValidator">{{\'latitude_required\' | translate}}</span>\n<span ng-message="longitudeValidator">{{\'longitude_required\' | translate}}</span>\n<span ng-message="customCoordinateValidator">{{\'latitude_longitude_required\' | translate}}</span>\n<span ng-message="uniqunessValidator">{{\'value_not_unique\' | translate}}</span>\n<span ng-message="email">{{\'value_must_be_email\' | translate}}</span>\n<span ng-message="urlValidator">{{\'url_error\' | translate}}</span>\n');
-	$templateCache.put('./templates/geometry-input-point.html','<div ng-form="geometryForm">\n    <div class="input-group">\n        <input type="number" \n               ng-model="geometry.coordinate.latitude" \n               ng-attr-placeholder="{{\'latitude\'| translate}}"\n               ng-class="{\'input-success\': d2LatSaved}"\n               name="latitude" \n               d2-coordinate-validator\n               ng-required="d2Required"\n               ng-disabled="d2Disabled"\n               ng-blur="updateLatLng(geometryForm)"\n               class="form-control no-right-radius"/>\n        <span class="input-group-btn empty-span"></span>\n        <input type="number" \n               ng-model="geometry.coordinate.longitude" \n               ng-attr-placeholder="{{\'longitude\'| translate}}"\n               ng-class="{\'input-success\': d2LngSaved}"\n               name="longitude" \n               d2-coordinate-validator\n               ng-required="d2Required"\n               ng-disabled="d2Disabled"\n               ng-blur="updateLatLng(geometryForm)"\n               class="form-control no-left-radius no-right-radius"/>\n        <span class="input-group-btn hideInPrint">\n            <button class="btn btn-grp trim hideInPrint" \n                    type="button"\n                    ng-disabled="{{d2Disabled}}"\n                    ng-attr-title="{{\'get_from_map\'| translate}}"\n                    ng-click="showMap()"> \n                <i class="fa fa-map-marker"></i>                             \n            </button>\n        </span>    \n    </div>\n    <div ng-messages="geometryForm.latitude.$error" ng-if="geometryForm.$submitted || geometryForm.latitude.$dirty" class="required" ng-messages-include="./templates/error-messages.html"></div>\n    <div ng-messages="geometryForm.longitude.$error" ng-if="geometryForm.$submitted || geometryForm.longitude.$dirty" class="required" ng-messages-include="./templates/error-messages.html"></div>\n</div>');
-	$templateCache.put('./templates/geometry-input-polygon.html','<div>\n    <div class="input-group">\n        <div class="geometry-polygon-indicator">{{polygonIndicator}}<span ng-show="hasPolygon" style="margin-left:2px;color:green" class="fa fa-check"></span></div>\n        <span class="input-group-btn hideInPrint">\n            <button class="btn btn-grp trim hideInPrint" \n                    type="button"\n                    ng-disabled="{{d2Disabled}}"\n                    ng-attr-title="{{\'get_from_map\'| translate}}"\n                    ng-click="showMap()"> \n                <i class="fa fa-map-marker"></i>                             \n            </button>\n        </span>    \n    </div>\n</div>');
+	$templateCache.put('./templates/geometry-input-point.html','<div ng-form="geometryForm">\n    <div class="input-group">\n        <input type="number" \n               ng-model="geometry.coordinate.latitude" \n               ng-attr-placeholder="{{\'latitude\'| translate}}"\n               ng-class="{\'input-success\': d2LatSaved}"\n               name="latitude" \n               d2-coordinate-validator\n               ng-required="d2Required"\n               ng-disabled="d2Disabled"\n               ng-blur="updateLatLng(geometryForm)"\n               class="form-control no-right-radius"/>\n        <span class="input-group-btn empty-span"></span>\n        <input type="number" \n               ng-model="geometry.coordinate.longitude" \n               ng-attr-placeholder="{{\'longitude\'| translate}}"\n               ng-class="{\'input-success\': d2LngSaved}"\n               name="longitude" \n               d2-coordinate-validator\n               ng-required="d2Required"\n               ng-disabled="d2Disabled"\n               ng-blur="updateLatLng(geometryForm)"\n               class="form-control no-left-radius no-right-radius"/>\n        <span class="input-group-btn hideInPrint">\n            <button class="btn btn-grp trim hideInPrint" \n                    type="button"\n                    ng-disabled="d2Disabled"\n                    ng-attr-title="{{\'get_from_map\'| translate}}"\n                    ng-click="showMap()"> \n                <i class="fa fa-map-marker"></i>                             \n            </button>\n        </span>    \n    </div>\n    <div ng-messages="geometryForm.latitude.$error" ng-if="geometryForm.$submitted || geometryForm.latitude.$dirty" class="required" ng-messages-include="./templates/error-messages.html"></div>\n    <div ng-messages="geometryForm.longitude.$error" ng-if="geometryForm.$submitted || geometryForm.longitude.$dirty" class="required" ng-messages-include="./templates/error-messages.html"></div>\n</div>');
+	$templateCache.put('./templates/geometry-input-polygon.html','<div>\n    <div class="input-group">\n        <div class="geometry-polygon-indicator">{{polygonIndicator}}<span ng-show="hasPolygon" style="margin-left:2px;color:green" class="fa fa-check"></span></div>\n        <span class="input-group-btn hideInPrint">\n            <button class="btn btn-grp trim hideInPrint" \n                    type="button"\n                    ng-disabled="d2Disabled"\n                    ng-attr-title="{{\'get_from_map\'| translate}}"\n                    ng-click="showMap()"> \n                <i class="fa fa-map-marker"></i>                             \n            </button>\n        </span>    \n    </div>\n</div>');
 	$templateCache.put('./templates/geometry-input.html','<div ng-include="currentGeometryTypeDefinition.template"></div>');
 	$templateCache.put('./templates/img-input.html','<div style="margin-top: 5px; margin-bottom: 5px;">\n    <accordion>\n        <accordion-group is-open="d2DisplayOpen">\n            <accordion-heading>\n                <span ng-if="!d2Event[d2DataElementId]"> {{\'please_select_an_image\'| translate}} <i class="pull-right" ng-class="{\'fa fa-chevron-up vertical-center\': d2DisplayOpen, \'fa fa-chevron-down vertical-center\': !d2DisplayOpen}"></i></span>\n                <span ng-if="d2Event[d2DataElementId]"> {{d2FileNames[d2Event.event][d2DataElementId].length > 20 ? d2FileNames[d2Event.event][d2DataElementId].substring(0,20).concat(\'...\') : d2FileNames[d2Event.event][d2DataElementId]}} <i class="pull-right" ng-class="{\'fa fa-chevron-up vertical-center\': d2DisplayOpen, \'fa fa-chevron-down vertical-center\': !d2DisplayOpen}"></i></span>\n            </accordion-heading>\n            <div class="preview clearfix" ng-if="d2Event[d2DataElementId]">\n                <div class="previewData clearfix" ng-init="fetch()">\n                    <img ng-if="!d2HideImage" class="img" ng-src={{path}} style="max-width:100%;"></img>\n                </div>\t\n            </div>\n            <div ng-if="!d2Event[d2DataElementId]">\n                <div class="form-group inputDnD">\n                    <input type="file"\n                           name="foo"\n                           ng-disabled="d2Disabled"\n                           input-field-id={{d2DataElementId}}\n                           d2-file-input-ps="d2Ps"\n                           d2-file-input="d2Event"\n                           d2-file-input-current-name="d2CurrentImageName"\n                           d2-file-input-name="d2FileNames"\n                           accept="image/*"\n                           class="form-control-file text-primary font-weight-bold"\n                           id="inputFile"\n                           data-title="{{\'drop_image\'| translate}}">\n                </div>\n            </div>\n            <div class="input-group" ng-show="d2CanEdit" style="margin-top: 5px;">\n                <div class="form-control">\n                    <a href ng-click="d2IsAttribute ? d2DownloadMethode(d2Tei, d2DataElementId) : d2DownloadMethode(d2Event.event, d2DataElementId)" ng-attr-title="{{d2FileNames[d2Event.event][d2DataElementId]}}">{{d2FileNames[d2Event.event][d2DataElementId].length > 20 ? d2FileNames[d2Event.event][d2DataElementId].substring(0,20).concat(\'...\') : d2FileNames[d2Event.event][d2DataElementId]}}</a>\n                </div>\n                <span class="input-group-btn">\n                    <span class="btn btn-grp btn-file" ng-click="delete()" ng-disabled="d2Disabled" ng-if="d2Event[d2DataElementId]" style="border-top-left-radius: 0px; border-bottom-left-radius: 0px;">\n                        <span ng-attr-title="{{\'delete\' | translate}}"\n                              d2-file-input-name="d2FileNames[d2Event.event][d2DataElementId]"\n                              d2-file-input-delete="d2Event[d2DataElementId]">\n                            <i class="fa fa-trash"></i>\n                        </span>\n                    </span>\n                    <span class="btn btn-grp btn-file" ng-if="!d2Event[d2DataElementId]" style="border-top-left-radius: 0px; border-bottom-left-radius: 0px;">\n                        <span ng-attr-title="{{\'upload\' | translate}}">\n                            <i class="fa fa-upload"></i>\n                            <input type="file"\n                                    ng-required="d2Required"\n                                    ng-disabled="d2Disabled"\n                                    name="foo"\n                                    input-field-id={{d2DataElementId}}\n                                    d2-file-input-ps="d2Ps"\n                                    d2-file-input="d2Event"\n                                    d2-file-input-current-name="d2CurrentImageName"\n                                    d2-file-input-name="d2FileNames"\n                                    accept="image/*">\n                        </span>\n                    </span>\n                </span>\n                <span class="input-group-btn">\n                    <button type="button" class="btn btn-default" ng-disabled="!d2Event[d2DataElementId]" ng-click="fetch()" style="border-radius: 4px; margin-left: 10px;">\n                        <i class="fa fa-refresh" aria-hidden="true"></i>\n                    </button>\n                </span>\n            </div>               \n        </accordion-group> \n    </accordion>\n</div>\n\n<style>\n    .inputDnD .form-control-file {\n        position: relative;\n        width: 100%;\n        height: 100%;\n        min-height: 6em;\n        outline: none;\n        visibility: hidden;\n        cursor: pointer;\n        background-color: #c61c23;\n        box-shadow: 0 0 5px solid currentColor;\n    }\n    .inputDnD .form-control-file:before {\n        content: attr(data-title);\n        position: absolute;\n        top: 0.5em;\n        left: 0;\n        width: 100%;\n        min-height: 6em;\n        line-height: 2em;\n        padding-top: 1.5em;\n        opacity: 1;\n        visibility: visible;\n        text-align: center;\n        border: 0.15em dashed currentColor;\n        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);\n        overflow: hidden;\n        border-top-left-radius: 15px;\n        border-top-right-radius: 15px;\n        border-bottom-left-radius: 15px;\n        border-bottom-right-radius: 15px;\n    }\n    .inputDnD .form-control-file:hover:before {\n        border-style: solid;\n        box-shadow: inset 0px 0px 0px 0.05em currentColor;\n        border-bottom-right-radius: 15px;\n        border-top-right-radius: 15px;\n        border-bottom-left-radius: 15px;\n        border-top-left-radius: 15px;\n    }\n</style>');
 	$templateCache.put('./templates/map.html','<div class="modal-header">\n    <h2>\n        {{\'point_and_click_for_coordinate\'| translate}}        \n    </h2>\n    <div class="align-center">\n        <span id=\'polygon-label\'></span>\n    </div>\n</div>\n<div class="modal-body map-area">\n    <span ng-switch="selectedTileKey">        \n        <span ng-switch-when="openstreetmap">\n            <leaflet id="openstreetmap" lf-center="center" defaults="mapDefaults" markers="marker" tiles="tilesDictionary[selectedTileKey]"></leaflet>\n        </span>\n        <span ng-switch-when="googlemap">\n            <leaflet id="googlemap" lf-center="center" defaults="mapDefaults" markers="marker" layers="tilesDictionary[selectedTileKey].layers"></leaflet>\n        </span>\n    </span>\n</div>\n<div class="modal-footer">\n    \n    <div class="pull-left">\n        <ul class="nav nav-pills">\n            <li ng-class="{true: \'active\'} [selectedTileKey === key]" ng-repeat="key in tilesDictionaryKeys">\n                <a href ng-click="setTile(key)">{{key | translate}}</a>\n            </li>\n        </ul>\n    </div>\n    \n    <button class="btn btn-primary" data-ng-click="captureCoordinate()">{{\'capture\'| translate}}</button>\n    <button class="btn btn-default" data-ng-click="close()">{{\'cancel\'| translate}}</button>        \n</div>');
@@ -26626,4 +26647,4 @@
 
 /***/ })
 /******/ ]);
-//# sourceMappingURL=app-02246e698d929979392f.js.map
+//# sourceMappingURL=app-6d63f70f95b9afc81452.js.map
