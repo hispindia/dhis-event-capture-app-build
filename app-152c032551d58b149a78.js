@@ -1231,7 +1231,7 @@
 	                        if (att) {
 	                            var attMaxDate = att.allowFutureDate ? '' : 0;
 	                            var isTrackerAssociate = att.valueType === 'TRACKER_ASSOCIATE';
-	                            var requiredInputField = 'attributeIsRequired('+att+')';
+	                            var requiredInputField = 'attributeIsRequired('+att.id+','+att.mandatory+')';
 	                            var disableInputField = 'attributeFieldDisabled(attributesById.'+attId+')';
 	                            var commonInputFieldProperty = ' name="' + fieldName + '"' +
 	                                ' element-id="' + i + '"' +
@@ -2264,7 +2264,7 @@
 	            variables = pushVariable(variables, 'due_date', executingEvent.dueDate, null, 'DATE', true, 'V', '' );
 	            variables = pushVariable(variables, 'event_count', evs ? evs.all.length : 0, null, 'INTEGER', true, 'V', '', false );
 	
-	            variables = pushVariable(variables, 'enrollment_date', selectedEnrollment ? selectedEnrollment.enrollmentDate : '', null, 'DATE', selectedEnrollment ? true : false, 'V', '', false );
+	            variables = pushVariable(variables, 'enrollment_date', selectedEnrollment ? selectedEnrollment.enrollmentDate : '', null, 'DATE', selectedEnrollment ? selectedEnrollment.enrollmentDate ? true : false : false, 'V', '', false );
 	            variables = pushVariable(variables, 'enrollment_id', selectedEnrollment ? selectedEnrollment.enrollment : '', null, 'TEXT',  selectedEnrollment ? true : false, 'V', '', false );
 	            variables = pushVariable(variables, 'event_id', executingEvent ? executingEvent.event : '', null, 'TEXT',  executingEvent ? true : false, 'V', executingEvent ? executingEvent.eventDate : false, false);
 	
@@ -2432,7 +2432,7 @@
 	                var brokenExecution = false;
 	                angular.forEach(dhisFunctions, function(dhisFunction){
 	                    //Select the function call, with any number of parameters inside single quotations, or number parameters witout quotations
-	                    var regularExFunctionCall = new RegExp(dhisFunction.name + "\\( *(([\\d/\\*\\+\\-%\.]+)|( *'[^']*'))*( *, *(([\\d/\\*\\+\\-%\.]+)|'[^']*'))* *\\)",'g');
+	                    var regularExFunctionCall = new RegExp(dhisFunction.name + "\\( *(([\\d/\\*\\+\\-%\. ]+)|( *'[^']*'))*( *, *(([\\d/\\*\\+\\-%\. ]+)|'[^']*'))* *\\)",'g');
 	                    var callsToThisFunction = expression.match(regularExFunctionCall);
 	                    angular.forEach(callsToThisFunction, function(callToThisFunction){
 	                        //Remove the function name and paranthesis:
@@ -3111,6 +3111,8 @@
 	                            if(angular.isUndefined( $rootScope.ruleeffects[ruleEffectKey][action.id] )){
 	                                $rootScope.ruleeffects[ruleEffectKey][action.id] =  {
 	                                    id:action.id,
+	                                    option:action.option,
+	                                    optionGroup:action.optionGroup,
 	                                    location:action.location,
 	                                    action:action.programRuleActionType,
 	                                    dataElement:action.dataElement,
@@ -3880,7 +3882,7 @@
 	    return {
 	        getChildren: function(uid){
 	            if( orgUnit !== uid ){
-	                orgUnitPromise = $http.get( DHIS2URL + '/organisationUnits/'+ uid + '.json?fields=id,path,level,children[id,displayName,level,children[id]]&paging=false' ).then(function(response){
+	                orgUnitPromise = $http.get( DHIS2URL + '/organisationUnits/'+ uid + '.json?fields=id,path,programs[id],level,children[id,displayName,programs[id],level,children[id]]&paging=false' ).then(function(response){
 	                    orgUnit = uid;
 	                    return response.data;
 	                });
@@ -3889,7 +3891,7 @@
 	        },
 	        get: function(uid){
 	            if( orgUnit !== uid ){
-	                orgUnitPromise = $http.get( DHIS2URL + '/organisationUnits/'+ uid + '.json?fields=id,displayName,level,path' ).then(function(response){
+	                orgUnitPromise = $http.get( DHIS2URL + '/organisationUnits/'+ uid + '.json?fields=id,displayName,programs[id],level,path' ).then(function(response){
 	                    orgUnit = uid;
 	                    return response.data;
 	                });
@@ -3929,7 +3931,7 @@
 	                def.resolve( ous );
 	            }
 	            else{
-	                var url = DHIS2URL + '/me.json?fields=organisationUnits[id,displayName,level,path,children[id,displayName,level,children[id]]],teiSearchOrganisationUnits[id,displayName,level,path,children[id,displayName,level,children[id]]]&paging=false';
+	                var url = DHIS2URL + '/me.json?fields=organisationUnits[id,displayName,programs[id],level,path,children[id,displayName,programs[id],level,children[id]]],teiSearchOrganisationUnits[id,displayName,programs[id],level,path,children[id,displayName,programs[id],level,children[id]]]&paging=false';
 	                $http.get( url ).then(function(response){
 	                    response.data.organisationUnits = response.data.teiSearchOrganisationUnits && response.data.teiSearchOrganisationUnits.length > 0 ? response.data.teiSearchOrganisationUnits : response.data.organisationUnits;
 	                    delete response.data.teiSearchOrganisationUnits;
@@ -5840,10 +5842,15 @@
 	            
 	            $scope.age = {};
 	            
-	            if( $scope.id && $scope.d2Object && $scope.d2Object[$scope.id] ){
-	                $scope.age.dob = $scope.d2Object[$scope.id];
-	                formatAge();
+	            var setDate = function(){
+	                if( $scope.id && $scope.d2Object && $scope.d2Object[$scope.id] ){
+	                    $scope.age.dob = $scope.d2Object[$scope.id];
+	                    formatAge();
+	                }
 	            }
+	
+	            setDate();
+	
 	            
 	            function formatAge(){
 	                if( $scope.age && $scope.age.dob !== "" ){
@@ -5862,7 +5869,15 @@
 	                    }
 	                }
 	            });
-	            
+	
+	            //In cases where the value is assigned with a program rule we need to set model.radio so that the UI updates.
+	            $scope.$watch('d2Object[id]',function(newValue, oldValue){
+	                if( newValue !== oldValue ){
+	                    $scope.age = {};
+	                    setDate();
+	                }        
+	            });
+	
 	            $scope.saveDOB = function(){                
 	                formatAge();                
 	            };
@@ -26626,4 +26641,4 @@
 
 /***/ })
 /******/ ]);
-//# sourceMappingURL=app-02246e698d929979392f.js.map
+//# sourceMappingURL=app-152c032551d58b149a78.js.map
