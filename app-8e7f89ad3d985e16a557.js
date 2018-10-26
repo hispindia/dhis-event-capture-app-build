@@ -2235,7 +2235,7 @@
 	            variables = pushVariable(variables, 'due_date', executingEvent.dueDate, null, 'DATE', true, 'V', '' );
 	            variables = pushVariable(variables, 'event_count', evs ? evs.all.length : 0, null, 'INTEGER', true, 'V', '', false );
 	
-	            variables = pushVariable(variables, 'enrollment_date', selectedEnrollment ? selectedEnrollment.enrollmentDate : '', null, 'DATE', selectedEnrollment ? true : false, 'V', '', false );
+	            variables = pushVariable(variables, 'enrollment_date', selectedEnrollment ? selectedEnrollment.enrollmentDate : '', null, 'DATE', selectedEnrollment ? selectedEnrollment.enrollmentDate ? true : false : false, 'V', '', false );
 	            variables = pushVariable(variables, 'enrollment_id', selectedEnrollment ? selectedEnrollment.enrollment : '', null, 'TEXT',  selectedEnrollment ? true : false, 'V', '', false );
 	            variables = pushVariable(variables, 'event_id', executingEvent ? executingEvent.event : '', null, 'TEXT',  executingEvent ? true : false, 'V', executingEvent ? executingEvent.eventDate : false, false);
 	
@@ -3676,7 +3676,7 @@
 	    return {
 	        getChildren: function(uid){
 	            if( orgUnit !== uid ){
-	                orgUnitPromise = $http.get( DHIS2URL + '/organisationUnits/'+ uid + '.json?fields=id,path,level,children[id,displayName,level,children[id]]&paging=false' ).then(function(response){
+	                orgUnitPromise = $http.get( DHIS2URL + '/organisationUnits/'+ uid + '.json?fields=id,path,programs[id],level,children[id,displayName,programs[id],level,children[id]]&paging=false' ).then(function(response){
 	                    orgUnit = uid;
 	                    return response.data;
 	                });
@@ -3685,7 +3685,7 @@
 	        },
 	        get: function(uid){
 	            if( orgUnit !== uid ){
-	                orgUnitPromise = $http.get( DHIS2URL + '/organisationUnits/'+ uid + '.json?fields=id,displayName,level,path' ).then(function(response){
+	                orgUnitPromise = $http.get( DHIS2URL + '/organisationUnits/'+ uid + '.json?fields=id,displayName,programs[id],level,path' ).then(function(response){
 	                    orgUnit = uid;
 	                    return response.data;
 	                });
@@ -3725,7 +3725,7 @@
 	                def.resolve( ous );
 	            }
 	            else{
-	                var url = DHIS2URL + '/me.json?fields=organisationUnits[id,displayName,level,path,children[id,displayName,level,children[id]]],teiSearchOrganisationUnits[id,displayName,level,path,children[id,displayName,level,children[id]]]&paging=false';
+	                var url = DHIS2URL + '/me.json?fields=organisationUnits[id,displayName,programs[id],level,path,children[id,displayName,programs[id],level,children[id]]],teiSearchOrganisationUnits[id,displayName,programs[id],level,path,children[id,displayName,programs[id],level,children[id]]]&paging=false';
 	                $http.get( url ).then(function(response){
 	                    response.data.organisationUnits = response.data.teiSearchOrganisationUnits && response.data.teiSearchOrganisationUnits.length > 0 ? response.data.teiSearchOrganisationUnits : response.data.organisationUnits;
 	                    delete response.data.teiSearchOrganisationUnits;
@@ -5439,10 +5439,15 @@
 	            
 	            $scope.age = {};
 	            
-	            if( $scope.id && $scope.d2Object && $scope.d2Object[$scope.id] ){
-	                $scope.age.dob = $scope.d2Object[$scope.id];
-	                formatAge();
+	            var setDate = function(){
+	                if( $scope.id && $scope.d2Object && $scope.d2Object[$scope.id] ){
+	                    $scope.age.dob = $scope.d2Object[$scope.id];
+	                    formatAge();
+	                }
 	            }
+	
+	            setDate();
+	
 	            
 	            function formatAge(){
 	                if( $scope.age && $scope.age.dob !== "" ){
@@ -5461,7 +5466,15 @@
 	                    }
 	                }
 	            });
-	            
+	
+	            //In cases where the value is assigned with a program rule we need to set model.radio so that the UI updates.
+	            $scope.$watch('d2Object[id]',function(newValue, oldValue){
+	                if( newValue !== oldValue ){
+	                    $scope.age = {};
+	                    setDate();
+	                }        
+	            });
+	
 	            $scope.saveDOB = function(){                
 	                formatAge();                
 	            };
@@ -25944,4 +25957,4 @@
 
 /***/ })
 /******/ ]);
-//# sourceMappingURL=app-e8518811d1010646982b.js.map
+//# sourceMappingURL=app-8e7f89ad3d985e16a557.js.map
