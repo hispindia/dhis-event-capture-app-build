@@ -24450,6 +24450,12 @@
 	        }
 	    };
 	
+	    $scope.setDateOnFocus = function (currentValue) {
+	        if (!currentValue) {
+	            $scope.currentEvent.eventDate = DateUtils.getToday();
+	        }
+	    };
+	
 	    $scope.completeEnrollment = function () {
 	        $scope.currentEvent.status = !$scope.currentEvent.status;
 	    };
@@ -26647,4 +26653,4 @@
 
 /***/ })
 /******/ ]);
-//# sourceMappingURL=app-6d63f70f95b9afc81452.js.map
+//# sourceMappingURL=app-bea9d65df148e43e3be4.js.map
