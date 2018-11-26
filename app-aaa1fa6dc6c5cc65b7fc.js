@@ -25612,7 +25612,7 @@
 	    };
 	
 	    $scope.hasDataWrite = function () {
-	        return $scope.selectedProgramStage && $scope.selectedProgramStage.access && $scope.selectedProgramStage.access.data.write;
+	        return $scope.selectedProgram && $scope.selectedProgram.access && $scope.selectedProgram.access.data.write;
 	    };
 	
 	    $scope.accessFilter = function (categoryOption) {
@@ -25957,4 +25957,4 @@
 
 /***/ })
 /******/ ]);
-//# sourceMappingURL=app-8e7f89ad3d985e16a557.js.map
+//# sourceMappingURL=app-aaa1fa6dc6c5cc65b7fc.js.map
