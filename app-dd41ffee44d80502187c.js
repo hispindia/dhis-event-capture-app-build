@@ -24404,6 +24404,8 @@
 	    var orgUnitFromUrl = $location.search().ou;
 	    var eventIdFromUrl = $location.search().event;
 	
+	    $scope.completeClicked = false;
+	
 	    //watch for selection of org unit from tree
 	    $scope.$watch('selectedOrgUnit', function () {
 	        if (angular.isObject($scope.selectedOrgUnit)) {
@@ -25323,6 +25325,7 @@
 	
 	        //check for form validity
 	        $scope.outerForm.submitted = true;
+	        $scope.completeClicked = true;
 	        if ($scope.outerForm.$invalid) {
 	            $scope.selectedSection.id = 'ALL';
 	            angular.forEach($scope.selectedProgramStage.programStageSections, function (section) {
@@ -25450,6 +25453,8 @@
 	                        $anchorScroll();
 	                    }
 	                }
+	                //Reset completeClicked check
+	                $scope.completeClicked = false;
 	                $scope.model.savingRegistration = false;
 	            });
 	        });
@@ -26063,6 +26068,7 @@
 	
 	        var isGridEdit = result.callerId === "eventGridEdit";
 	        var dataElementOptionsChanged = [];
+	        var shouldValidate = $scope.currentStage.validationStrategy === 'ON_UPDATE_AND_INSERT' ? true : $scope.completeClicked;
 	        if ($rootScope.ruleeffects[result.event]) {
 	            //Establish which event was affected:
 	            var affectedEvent = $scope.currentEvent;
@@ -26106,7 +26112,7 @@
 	
 	                        var message = effect.content + (effect.data ? effect.data : "");
 	
-	                        if (effect.dataElement && effect.dataElement.id && effect.action === "SHOWERROR") {
+	                        if (effect.dataElement && effect.dataElement.id && effect.action === "SHOWERROR" && shouldValidate) {
 	                            message = $scope.prStDes[effect.dataElement.id].dataElement.displayFormName + ": " + message;
 	                            $scope.currentEvent[effect.dataElement.id] = $scope.currentEventOriginialValue[effect.dataElement.id];
 	                            var dialogOptions = {
@@ -26697,4 +26703,4 @@
 
 /***/ })
 /******/ ]);
-//# sourceMappingURL=app-fd16aae9a23e46be3977.js.map
+//# sourceMappingURL=app-dd41ffee44d80502187c.js.map
