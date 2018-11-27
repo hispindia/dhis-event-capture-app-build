@@ -109,7 +109,7 @@
 	
 	/* App Module */
 	
-	var eventCapture = angular.module('eventCapture', ['ui.bootstrap', 'ngRoute', 'ngCookies', 'ngMessages', 'ngSanitize', 'eventCaptureDirectives', 'eventCaptureControllers', 'eventCaptureServices', 'eventCaptureFilters', 'd2Filters', 'd2Directives', 'd2Services', 'd2Controllers', 'd2Templates', 'ui.select', 'angularLocalStorage', 'pascalprecht.translate', 'leaflet-directive']).value('DHIS2URL', '../api/28').value('DHIS2COORDINATESIZE', 6).config(["$routeProvider", "$translateProvider", "$logProvider", function ($routeProvider, $translateProvider, $logProvider) {
+	var eventCapture = angular.module('eventCapture', ['ui.bootstrap', 'ngRoute', 'ngCookies', 'ngMessages', 'ngSanitize', 'eventCaptureDirectives', 'eventCaptureControllers', 'eventCaptureServices', 'eventCaptureFilters', 'd2Filters', 'd2Directives', 'd2Services', 'd2Controllers', 'd2Templates', 'ui.select', 'angularLocalStorage', 'pascalprecht.translate', 'leaflet-directive']).value('DHIS2URL', '../api/29').value('DHIS2COORDINATESIZE', 6).config(["$routeProvider", "$translateProvider", "$logProvider", function ($routeProvider, $translateProvider, $logProvider) {
 	
 	    $routeProvider.when('/', {
 	        templateUrl: 'views/home.html',
@@ -25957,4 +25957,4 @@
 
 /***/ })
 /******/ ]);
-//# sourceMappingURL=app-aaa1fa6dc6c5cc65b7fc.js.map
+//# sourceMappingURL=app-5207d00f7a2aa2e3e5a9.js.map
