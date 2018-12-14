@@ -5343,9 +5343,15 @@
 	                $scope.d2CallbackFunction();
 	            }
 	
+	            var geometryHasValue = function(){
+	                return $scope.geometry && $scope.geometry.coordinates && $scope.geometry.coordinates.length > 0;
+	            }
+	
 	            $scope.showMap = function(){
-	                var geo = angular.copy($scope.geometry);
-	                delete geo.coordinate;    
+	                var geoJson = geometryHasValue() ? angular.copy($scope.geometry) : null;
+	                if(geoJson){
+	                    delete geoJson.coordinate;
+	                }
 	                var modalInstance = $modal.open({
 	                    templateUrl: './templates/map.html',
 	                    controller: 'MapController',
@@ -5355,7 +5361,7 @@
 	                            return $scope.currentGeometryTypeDefinition.type;
 	                        },
 	                        geoJson: function () {
-	                            return $scope.geometry;
+	                            return geoJson;
 	                        }
 	                    }
 	                });
@@ -5991,7 +5997,7 @@
 	            $scope.search = function(searchParam){
 	                if(!searchParam){
 	                    currentFilteredOptions = filteredOptions;
-	                } else {
+	                } else {
 	                    currentFilteredOptions = $filter('filter')(filteredOptions, searchParam);
 	                }                
 	                setOptions();
@@ -6625,9 +6631,10 @@
 	                CurrentSelection,
 	                DHIS2URL,
 	                NotificationService,
+	                ModalService,
 	                geometryType,
 	                geoJson) {
-	
+	    var inDrawMode = false;
 	    $scope.tilesDictionaryKeys = ['openstreetmap', 'googlemap'];   
 	    $scope.selectedTileKey = 'openstreetmap';           
 	    $scope.tilesDictionary = {
@@ -7018,13 +7025,11 @@
 	                console.log($scope.location);
 	                
 	            });
-	            map.on('draw:deleted', function(e){
-	                var g = 1;
-	                var u = 2;
+	            map.on('draw:toolbaropened', function(e){
+	                inDrawMode = true;
 	            });
-	            map.on('draw:deletestarted', function(e){
-	                var g = 1;
-	                var u = 2;
+	            map.on('draw:toolbarclosed', function(e){
+	                inDrawMode = false;
 	            });
 	        });
 	    }
@@ -7079,14 +7084,33 @@
 	    $scope.close = function () {
 	        $modalInstance.dismiss();
 	    };
-	    
-	    $scope.captureCoordinate = function(){
+	
+	    var internalCaptureCoordinate = function(){
 	        var geoJson = currentGeometryType.getGeoJson();
 	        if(!geoJson){
 	            NotificationService.showNotifcationDialog($translate.instant("warning"), $translate.instant("no_geometry_captured"));
 	        }
 	        $modalInstance.close(geoJson);
+	    }
+	    
+	    $scope.captureCoordinate = function(){
+	        
+	        if(inDrawMode) {
+	            var modalOptions = {
+	                closeButtonText: "Cancel",
+	                actionButtonText: 'OK',
+	                headerText: 'cancel_capturing_polygon',
+	                bodyText: 'you_are_currently_in_draw_mode_all_unfinished_changes_will_be_lost',
+	            };
+	            ModalService.showModal({},modalOptions).then(function(){
+	                internalCaptureCoordinate();
+	            }, function(){});
+	            return;
+	        }
+	        internalCaptureCoordinate();
 	    };
+	
+	
 	    
 	    function setDraggedMarker( args ){
 	        if( args ){
@@ -7396,7 +7420,7 @@
 	$templateCache.put('./templates/geometry-input.html','<div ng-include="currentGeometryTypeDefinition.template"></div>');
 	$templateCache.put('./templates/img-input.html','<div style="margin-top: 5px; margin-bottom: 5px;">\n    <accordion>\n        <accordion-group is-open="d2DisplayOpen">\n            <accordion-heading>\n                <span ng-if="!d2Event[d2DataElementId]"> {{\'please_select_an_image\'| translate}} <i class="pull-right" ng-class="{\'fa fa-chevron-up vertical-center\': d2DisplayOpen, \'fa fa-chevron-down vertical-center\': !d2DisplayOpen}"></i></span>\n                <span ng-if="d2Event[d2DataElementId]"> {{d2FileNames[d2Event.event][d2DataElementId].length > 20 ? d2FileNames[d2Event.event][d2DataElementId].substring(0,20).concat(\'...\') : d2FileNames[d2Event.event][d2DataElementId]}} <i class="pull-right" ng-class="{\'fa fa-chevron-up vertical-center\': d2DisplayOpen, \'fa fa-chevron-down vertical-center\': !d2DisplayOpen}"></i></span>\n            </accordion-heading>\n            <div class="preview clearfix" ng-if="d2Event[d2DataElementId]">\n                <div class="previewData clearfix" ng-init="fetch()">\n                    <img ng-if="!d2HideImage" class="img" ng-src={{path}} style="max-width:100%;"></img>\n                </div>\t\n            </div>\n            <div ng-if="!d2Event[d2DataElementId]">\n                <div class="form-group inputDnD">\n                    <input type="file"\n                           name="foo"\n                           ng-disabled="d2Disabled"\n                           input-field-id={{d2DataElementId}}\n                           d2-file-input-ps="d2Ps"\n                           d2-file-input="d2Event"\n                           d2-file-input-current-name="d2CurrentImageName"\n                           d2-file-input-name="d2FileNames"\n                           accept="image/*"\n                           class="form-control-file text-primary font-weight-bold"\n                           id="inputFile"\n                           data-title="{{\'drop_image\'| translate}}">\n                </div>\n            </div>\n            <div class="input-group" ng-show="d2CanEdit" style="margin-top: 5px;">\n                <div class="form-control">\n                    <a href ng-click="d2IsAttribute ? d2DownloadMethode(d2Tei, d2DataElementId) : d2DownloadMethode(d2Event.event, d2DataElementId)" ng-attr-title="{{d2FileNames[d2Event.event][d2DataElementId]}}">{{d2FileNames[d2Event.event][d2DataElementId].length > 20 ? d2FileNames[d2Event.event][d2DataElementId].substring(0,20).concat(\'...\') : d2FileNames[d2Event.event][d2DataElementId]}}</a>\n                </div>\n                <span class="input-group-btn">\n                    <span class="btn btn-grp btn-file" ng-click="delete()" ng-disabled="d2Disabled" ng-if="d2Event[d2DataElementId]" style="border-top-left-radius: 0px; border-bottom-left-radius: 0px;">\n                        <span ng-attr-title="{{\'delete\' | translate}}"\n                              d2-file-input-name="d2FileNames[d2Event.event][d2DataElementId]"\n                              d2-file-input-delete="d2Event[d2DataElementId]">\n                            <i class="fa fa-trash"></i>\n                        </span>\n                    </span>\n                    <span class="btn btn-grp btn-file" ng-if="!d2Event[d2DataElementId]" style="border-top-left-radius: 0px; border-bottom-left-radius: 0px;">\n                        <span ng-attr-title="{{\'upload\' | translate}}">\n                            <i class="fa fa-upload"></i>\n                            <input type="file"\n                                    ng-required="d2Required"\n                                    ng-disabled="d2Disabled"\n                                    name="foo"\n                                    input-field-id={{d2DataElementId}}\n                                    d2-file-input-ps="d2Ps"\n                                    d2-file-input="d2Event"\n                                    d2-file-input-current-name="d2CurrentImageName"\n                                    d2-file-input-name="d2FileNames"\n                                    accept="image/*">\n                        </span>\n                    </span>\n                </span>\n                <span class="input-group-btn">\n                    <button type="button" class="btn btn-default" ng-disabled="!d2Event[d2DataElementId]" ng-click="fetch()" style="border-radius: 4px; margin-left: 10px;">\n                        <i class="fa fa-refresh" aria-hidden="true"></i>\n                    </button>\n                </span>\n            </div>               \n        </accordion-group> \n    </accordion>\n</div>');
 	$templateCache.put('./templates/map.html','<div class="modal-header">\n    <h2>\n        {{\'point_and_click_for_coordinate\'| translate}}        \n    </h2>\n    <div class="align-center">\n        <span id=\'polygon-label\'></span>\n    </div>\n</div>\n<div class="modal-body map-area">\n    <span ng-switch="selectedTileKey">        \n        <span ng-switch-when="openstreetmap">\n            <leaflet id="openstreetmap" lf-center="center" defaults="mapDefaults" markers="marker" tiles="tilesDictionary[selectedTileKey]"></leaflet>\n        </span>\n        <span ng-switch-when="googlemap">\n            <leaflet id="googlemap" lf-center="center" defaults="mapDefaults" markers="marker" layers="tilesDictionary[selectedTileKey].layers"></leaflet>\n        </span>\n    </span>\n</div>\n<div class="modal-footer">\n    \n    <div class="pull-left">\n        <ul class="nav nav-pills">\n            <li ng-class="{true: \'active\'} [selectedTileKey === key]" ng-repeat="key in tilesDictionaryKeys">\n                <a href ng-click="setTile(key)">{{key | translate}}</a>\n            </li>\n        </ul>\n    </div>\n    \n    <button class="btn btn-primary" data-ng-click="captureCoordinate()">{{\'capture\'| translate}}</button>\n    <button class="btn btn-default" data-ng-click="close()">{{\'cancel\'| translate}}</button>        \n</div>');
-	$templateCache.put('./templates/more-options-list.html','    <!--<ui-select ng-model="d2Model[d2ModelId]"\n               theme="select2"\n               ng-required="d2Required"\n               ng-disabled="d2Disabled"\n               name="foo"\n               on-select="saveOption()"\n               class="ui-select-style">\n        <ui-select-match allow-clear="true" ng-class="d2UseNotification ? getInputNotifcationClass(d2ModelId) : \'\';"  class="form-control-ui-select"  ng-attr-placeholder="{{\'select_or_search\' | translate}}">{{$select.selected.displayName  || $select.selected}}</ui-select-match>\n        <ui-select-choices repeat="option.displayName as option in displayOptions track by option.id" ui-disable-choice="option.id===loadMoreId" refresh="search($select.search)" refresh-delay="500">\n            <span ng-if="option.id!==loadMoreId" ng-bind-html="option.displayName | highlight: $select.search"></span>\n            <div ng-if="option.id===loadMoreId">\n                <button class="btn btn-xs btn-default" \n                        style="width: 100%; margin-top: 5px;" \n                        ng-click="showMore($select, $event);"\n                        ng-disabled="loading">{{\'show_more\' | translate}}</button>                              \n              </div>\n        </ui-select-choices>\n    </ui-select>-->\n\n<div class="optionListContainer">\n    <div ng-click="toggleOptionList()" class="optionListInput" ng-class="{ \'optionListInputOpen\': optionListOpen }">\n        <div class="optionListInputText" >\n            <span ng-if="d2Model[d2ModelId]">{{ d2Model[d2ModelId] }}</span>\n            <span ng-if="!d2Model[d2ModelId]" class="optionListInputTextPlaceholder">{{\'select_or_search\' | translate}}</span>\n        </div>\n        <div class="optionListInputDelete" ng-click="removeSelectedOption($event)"><i class="fa fa-times" ng-if="d2Model && d2Model[d2ModelId]"></i></div>\n        <div class="optionListInputToggle"><i class="fa fa-caret-up" ng-show="optionListOpen"></i><i class="fa fa-caret-down" ng-hide="optionListOpen"></i></div>\n    </div>\n    <div ng-if="optionListOpen" class="optionListPopup">\n        <div class="optionListSearchInputContainer">\n            <input type="text" class="form-control" ng-model="searchText" ng-change="search(searchText)" ng-model-options="{ debounce: 600 }" placeholder="Search..."/>\n        </div>\n        <div vs-repeat class="optionListVsRepeater">\n            <div ng-repeat="option in displayOptions track by option.id" class="optionListItem" ng-click="selectOption(option)" ng-class="{ \'optionListItemSelected\': (option.displayName===d2Model[d2ModelId])}">\n                {{option.displayName}}\n            </div>\n        </div>\n    </div>\n</div>\n');
+	$templateCache.put('./templates/more-options-list.html','<div class="optionListContainer">\n    <div ng-if="d2Disabled"><input class="form-control" ng-model="d2Model[d2ModelId]" disabled></div>\n    <div ng-click="toggleOptionList()" ng-if="!d2Disabled" class="optionListInput" ng-class="{ \'optionListInputOpen\': optionListOpen }">\n        <div class="optionListInputText" >\n            <span ng-if="d2Model[d2ModelId]">{{d2Model[d2ModelId]}}</span>\n            <span ng-if="!d2Model[d2ModelId]" class="optionListInputTextPlaceholder">{{\'select_or_search\' | translate}}</span>\n        </div>\n        <div class="optionListInputDelete" ng-click="removeSelectedOption($event)"><i class="fa fa-times" ng-if="d2Model && d2Model[d2ModelId]"></i></div>\n        <div class="optionListInputToggle"><i class="fa fa-caret-up" ng-show="optionListOpen"></i><i class="fa fa-caret-down" ng-hide="optionListOpen"></i></div>\n    </div>\n    <div ng-if="optionListOpen" class="optionListPopup">\n        <div class="optionListSearchInputContainer">\n            <input type="text" class="form-control" ng-model="searchText" ng-change="search(searchText)" ng-model-options="{ debounce: 600 }" placeholder="Search..."/>\n        </div>\n        <div vs-repeat class="optionListVsRepeater">\n            <div ng-repeat="option in displayOptions track by option.id" class="optionListItem" ng-click="selectOption(option)" ng-class="{ \'optionListItemSelected\': (option.displayName===d2Model[d2ModelId])}">\n                {{option.displayName}}\n            </div>\n        </div>\n    </div>\n</div>\n');
 	$templateCache.put('./templates/orgunit-input.html','<div class="input-group">    \n    <input type="text" name="foo" ng-disabled="true" class="form-control" ng-attr-placeholder="{{\'please_select\' | translate}}" ng-model="d2OrgunitNames[d2Object[id]]" ng-disabled="{{d2Disabled}}" ng-required="{{d2Required}}"> \n    <span class="input-group-btn"> \n        <button class="btn btn-danger hideInPrint trim" type="button" ng-attr-title="{{\'remove\' | translate}}" ng-disabled="d2Disabled" ng-click="removeSelectedOrgUnit(id)" ng-if="d2Object[id]"> \n            <i class="fa fa-trash-o"></i> \n        </button> \n        <button class="btn btn-default hideInPrint trim" type="button" ng-attr-title="{{\'get_from_tree\' | translate}}" ng-disabled="d2Disabled" ng-click="showOrgUnitTree(id)"> \n            <i class="fa fa-plus-square-o"></i> \n        </button> \n    </span> \n</div>');
 	$templateCache.put('./templates/orgunit-tree.html','<div class="modal-header page">\n    <h3>{{\'org_unit\'| translate}}</h3>\n</div>\n<div class="modal-body page">\n    <div class="input-group">    \n        <input type="text" \n            name="orgUnitFilterText" \n            d2-on-enter-blur\n            d2-on-blur-change="filterOrgUnits()"\n            ng-model="orgUnitFilterText" \n            class="form-control" ng-attr-placeholder="{{\'search\' | translate}}"> \n        <span class="input-group-btn"> \n            <button class="btn btn-success hideInPrint trim" type="button" ng-attr-title="{{\'search\' | translate}}" ng-disabled="!orgUnitFilterText" ng-click="filterOrgUnits()"> \n                <i class="fa fa-search"></i> \n            </button> \n            <button class="btn btn-danger hideInPrint trim" type="button" ng-attr-title="{{\'clear\' | translate}}" ng-disabled="!orgUnitFilterText" ng-click="filterOrgUnits(true)"> \n                <i class="fa fa-trash-o"></i>\n            </button> \n        </span> \n    </div>\n    <div class="org-unit-tree" data-stop-propagation="true">\n        <script type="text/ng-template" id="orgUnitTree.html">\n            <span class="org-unit-tree-button" ng-click="expandCollapse(orgUnit)" ng-show="orgUnit.show && orgUnit.children.length > 0"><i class="fa fa-minus-square-o"></i></span>\n            <span class="org-unit-tree-button" ng-click="expandCollapse(orgUnit)" ng-show="(!orgUnit.show && orgUnit.children.length > 0) || (!orgUnit.show && orgUnit.hasChildren)"><i class="fa fa-plus-square-o"></i></span>\n            <span class="org-unit-tree-button" ng-click="setSelectedOrgUnit(orgUnit)" ng-class="{\'selected-org-unit\' : orgUnit.id === model.selectedOrgUnitId}">{{orgUnit.displayName}}</span>\n            <ul class="tree" id="tree" ng-show="orgUnit.show">\n                <li ng-repeat="orgUnit in orgUnit.children | orderBy:[\'level\',\'displayName\']" ng-include="\'orgUnitTree.html\'"></li>\n            </ul>\n        </script>\n        <ul class="tree" id="tree">\n            <li ng-repeat="orgUnit in orgUnitsDataElement | orderBy:[\'level\',\'displayName\']" ng-include="\'orgUnitTree.html\'"></li>\n        </ul>\n    </div>\n</div>\n<div class="modal-footer page">\n    <button class="btn btn-primary" data-ng-click="select()">{{\'select\'| translate}}</button>\n    <button class="btn btn-default" data-ng-click="close()">{{\'close\'| translate}}</button>\n</div>');
 	$templateCache.put('./templates/radio-button.html','<!--\nCopyright (c) 2015, UiO\nAll rights reserved.\n\nRedistribution and use in source and binary forms, with or without\nmodification, are permitted provided that the following conditions are met:\n\n* Redistributions of source code must retain the above copyright notice, this\n  list of conditions and the following disclaimer.\n* Redistributions in binary form must reproduce the above copyright notice,\n  this list of conditions and the following disclaimer in the documentation\n  and/or other materials provided with the distribution.\n\nTHIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"\nAND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE\nIMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE\nARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE\nLIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR\nCONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF\nSUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS\nINTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN\nCONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)\nARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE\nPOSSIBILITY OF SUCH DAMAGE.\n-->\n \n\n<div tabindex="0" ng-if="!disabled" class="custom-radio-group custom-radio-container">\n    <span ng-click="valueClicked(\'true\')" class="cursor-pointer">\n        <span class="fa-stack">                                                                                                        \n            <span class=\'fa fa-stack-1x fa-circle radio-default fa-stack-custom-large\' ng-class=\'radioButtonColor("true")\'></span>        \n            <span class="fa fa-stack-1x fa-circle-thin fa-stack-custom-large"></span>\n            <span class="fa-stack-custom-small" ng-class="radioButtonImage(\'true\')"></span>\n        </span>\n        <span class="custom-radio-text">\n            {{\'Yes\' | translate }}\n        </span>\n    </span>\n    &nbsp;&nbsp;    \n    <span ng-click="valueClicked(\'false\')" class="cursor-pointer">\n        <span class="fa-stack">                                                                                                        \n            <span class=\'fa fa-stack-1x fa-circle fa-stack-custom-large\' ng-class=\'radioButtonColor("false")\'></span>                                                    \n            <span class="fa fa-stack-1x fa-circle-thin fa-stack-custom-large"></span>\n            <span class="fa-stack-custom-small" ng-class="radioButtonImage(\'false\')"></span>\n        </span>\n        <span class="custom-radio-text">\n            {{\'No\' | translate }}\n        </span>        \n    </span>\n    <div ng-if="status === \'error\'" class="custom-radio-error input-error"><span>{{\'save failed\' | translate}}</span></div>\n    \n    \n    <div ng-show="false">\n        <label class="radio-inline">                                                    \n            <input class="radio-display-none" ng-required="required" style=\'margin-top: 1px\' type="radio" ng-model="value" ng-disabled="disabled" name="{{name}}" ng-attr-value="true">                                                    \n        </label>                                                \n        <label class="radio-inline">\n            <input class="radio-display-none" ng-required="required" style=\'margin-top: 1px\' type="radio" ng-model="value" ng-disabled="disabled" name="{{name}}" ng-attr-value="false">\n        </label>\n    </div>\n</div>\n<div ng-if="disabled" class="custom-radio-container">\n    <span class="fa-icon-width" ng-class="getDisabledIcon(value)"></span>\n    <span>{{getDisabledValue(value) | translate}}</span>         \n</div>');
@@ -26752,4 +26776,4 @@
 
 /***/ })
 /******/ ]);
-//# sourceMappingURL=app-22049f58075ecdd02ab9.js.map
+//# sourceMappingURL=app-30f938b9b1c85df465aa.js.map
