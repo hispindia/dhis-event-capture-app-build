@@ -25436,7 +25436,8 @@
 	                orgUnit: $scope.selectedOrgUnit.id,
 	                status: $scope.currentEvent.status ? 'COMPLETED' : 'ACTIVE',
 	                eventDate: DateUtils.formatFromUserToApi(newEvent.eventDate),
-	                dataValues: dataValues
+	                dataValues: dataValues,
+	                geometry: newEvent.geometry
 	            };
 	
 	            if (dhis2Event.status === 'COMPLETED') {
@@ -25570,13 +25571,9 @@
 	                status: $scope.currentEvent.status ? 'COMPLETED' : 'ACTIVE',
 	                eventDate: DateUtils.formatFromUserToApi($scope.currentEvent.eventDate),
 	                event: $scope.currentEvent.event,
-	                dataValues: dataValues
+	                dataValues: dataValues,
+	                geometry: $scope.currentEvent.geometry
 	            };
-	
-	            if ($scope.selectedProgramStage.captureCoordinates) {
-	                updatedEvent.coordinate = { latitude: $scope.currentEvent.coordinate.latitude ? $scope.currentEvent.coordinate.latitude : '',
-	                    longitude: $scope.currentEvent.coordinate.longitude ? $scope.currentEvent.coordinate.longitude : '' };
-	            }
 	
 	            if (!angular.isUndefined($scope.note.value) && $scope.note.value !== '') {
 	
@@ -26776,4 +26773,4 @@
 
 /***/ })
 /******/ ]);
-//# sourceMappingURL=app-30f938b9b1c85df465aa.js.map
+//# sourceMappingURL=app-40c55ad3173f0c2e6833.js.map
