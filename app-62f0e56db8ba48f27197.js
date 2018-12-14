@@ -68,31 +68,27 @@
 	
 	__webpack_require__(8);
 	
-	__webpack_require__(!(function webpackMissingModule() { var e = new Error("Cannot find module \"d2-tracker/src/styles/style.css\""); e.code = 'MODULE_NOT_FOUND'; throw e; }()));
+	__webpack_require__(9);
 	
-	var _leaflet = __webpack_require__(9);
+	var _leaflet = __webpack_require__(13);
 	
 	var _leaflet2 = _interopRequireDefault(_leaflet);
 	
-	__webpack_require__(10);
+	__webpack_require__(14);
 	
-	__webpack_require__(11);
+	__webpack_require__(15);
 	
-	__webpack_require__(12);
-	
-	__webpack_require__(18);
-	
-	__webpack_require__(19);
+	__webpack_require__(16);
 	
 	__webpack_require__(20);
 	
-	__webpack_require__(25);
+	__webpack_require__(21);
 	
-	__webpack_require__(30);
+	__webpack_require__(22);
+	
+	__webpack_require__(27);
 	
 	__webpack_require__(32);
-	
-	__webpack_require__(33);
 	
 	__webpack_require__(34);
 	
@@ -102,15 +98,19 @@
 	
 	__webpack_require__(37);
 	
+	__webpack_require__(38);
+	
+	__webpack_require__(39);
+	
 	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 	
 	delete _leaflet2.default.Icon.Default.prototype._getIconUrl; // Tracker core
 	
 	
 	_leaflet2.default.Icon.Default.mergeOptions({
-	    iconRetinaUrl: __webpack_require__(38),
-	    iconUrl: __webpack_require__(29),
-	    shadowUrl: __webpack_require__(39)
+	    iconRetinaUrl: __webpack_require__(40),
+	    iconUrl: __webpack_require__(31),
+	    shadowUrl: __webpack_require__(41)
 	});
 	
 	_leaflet2.default.Icon.Default.imagePath = '../dhis-web-commons/leaflet/images';
@@ -4371,6 +4371,16 @@
 	        },
 	        link: function (scope, element) {
 	            var content, program;
+	            var hideClickOutside = function(e){
+	                if (!element[0].contains(e.target)) {
+	                    element.popover('hide');
+	                    //Fix for bootstrap 3.0.2. This is fixed in 3.1.0
+	                    var popover = element.siblings('.popover.fade.right');
+	                    if(popover) popover.remove();
+	                }
+	            }
+	
+	
 	            if (scope.content) {
 	                content = $templateCache.get(scope.template);
 	                content = $compile(content)(scope);
@@ -4386,15 +4396,12 @@
 	                    html: true,
 	                    title: $translate.instant('_details')
 	                };
-	                element.popover(options);
-	
-	                $('body').on('click', function (e) {
-	                    if (!element[0].contains(e.target)) {
-	                        element.popover('hide');
-	                        //Fix for bootstrap 3.0.2. This is fixed in 3.1.0
-	                        var popover = element.siblings('.popover.fade.right');
-	                        if(popover) popover.remove();
-	                    }
+	                var popover = element.popover(options);
+	                popover.on('show.bs.popover', function(){
+	                    $('body').bind('click', hideClickOutside);
+	                });
+	                popover.on('hide.bs.popover', function(){
+	                    $('body').unbind('click', hideClickOutside);
 	                });
 	            }
 	        }
@@ -5336,9 +5343,15 @@
 	                $scope.d2CallbackFunction();
 	            }
 	
+	            var geometryHasValue = function(){
+	                return $scope.geometry && $scope.geometry.coordinates && $scope.geometry.coordinates.length > 0;
+	            }
+	
 	            $scope.showMap = function(){
-	                var geo = angular.copy($scope.geometry);
-	                delete geo.coordinate;    
+	                var geoJson = geometryHasValue() ? angular.copy($scope.geometry) : null;
+	                if(geoJson){
+	                    delete geoJson.coordinate;
+	                }
 	                var modalInstance = $modal.open({
 	                    templateUrl: './templates/map.html',
 	                    controller: 'MapController',
@@ -5348,7 +5361,7 @@
 	                            return $scope.currentGeometryTypeDefinition.type;
 	                        },
 	                        geoJson: function () {
-	                            return $scope.geometry;
+	                            return geoJson;
 	                        }
 	                    }
 	                });
@@ -5929,14 +5942,43 @@
 	            d2OptionFilter: "="
 			},
 			link: function (scope, element, attrs) {
-	            
+	            scope.optionListOpen = false;
+	            scope.searchText = '';
+	            var onClickOutside = function(event){
+	                var isClickedElementChildOfPopup = element
+	                    .find(event.target)
+	                    .length > 0;
+	        
+	                if (isClickedElementChildOfPopup)
+	                    return;
+	        
+	                scope.$applyAsync(function(){
+	                    scope.closeOptionList();
+	                });
+	            }
+	            scope.toggleOptionList = function(){
+	                if(scope.optionListOpen) {
+	                    scope.closeOptionList();
+	                    return;
+	                }
+	                scope.openOptionList();
+	            }
+	            scope.closeOptionList = function(){
+	                scope.optionListOpen = false;
+	                scope.search();
+	                $(document).unbind('click', onClickOutside);
+	            }
+	
+	            scope.openOptionList = function(){
+	                scope.optionListOpen = true;
+	                $(document).bind('click', onClickOutside);
+	            }
 	        },
 	        controller: function($scope,$filter) {
 	            $scope.loadMoreId = "loadMore";
 	            var filteredOptions;
 	            var currentFilteredOptions;
 	            $scope.displayOptions = [];
-	
 	
 	            var filterOptions = function(){
 	                if($scope.d2OptionFilter && $scope.d2OptionFilter[$scope.d2ModelId] && ($scope.d2OptionFilter[$scope.d2ModelId].showOnly || $scope.d2OptionFilter[$scope.d2ModelId].hidden)){
@@ -5953,15 +5995,28 @@
 	            }
 	
 	            $scope.search = function(searchParam){
-	                currentFilteredOptions = $filter('filter')(filteredOptions, searchParam);
+	                if(!searchParam){
+	                    currentFilteredOptions = filteredOptions;
+	                } else {
+	                    currentFilteredOptions = $filter('filter')(filteredOptions, searchParam);
+	                }                
 	                setOptions();
 	            }
 	
 	            var setOptions = function(){
-	                $scope.displayOptions = currentFilteredOptions.slice(0, $scope.d2MaxOptionSize);
-	                if(currentFilteredOptions.length > $scope.d2MaxOptionSize){
-	                    $scope.displayOptions.push({id: $scope.loadMoreId, displayName:'Load more' });
-	                }
+	                $scope.displayOptions = currentFilteredOptions;
+	            }
+	
+	            $scope.selectOption = function(option){
+	                $scope.d2Model[$scope.d2ModelId] = option.displayName;
+	                $scope.closeOptionList();
+	                $scope.d2Change();
+	            }
+	
+	            $scope.removeSelectedOption = function(event){
+	                event.stopPropagation();
+	                $scope.d2Model[$scope.d2ModelId] = null;
+	                $scope.d2Change();
 	            }
 	
 	            filterOptions();
@@ -5994,6 +6049,7 @@
 	
 				$scope.saveOption = function() {
 	                $scope.d2Change();
+	                
 				};
 	
 				$scope.getInputNotifcationClass = function(id) {
@@ -6575,9 +6631,10 @@
 	                CurrentSelection,
 	                DHIS2URL,
 	                NotificationService,
+	                ModalService,
 	                geometryType,
 	                geoJson) {
-	
+	    var inDrawMode = false;
 	    $scope.tilesDictionaryKeys = ['openstreetmap', 'googlemap'];   
 	    $scope.selectedTileKey = 'openstreetmap';           
 	    $scope.tilesDictionary = {
@@ -6968,13 +7025,11 @@
 	                console.log($scope.location);
 	                
 	            });
-	            map.on('draw:deleted', function(e){
-	                var g = 1;
-	                var u = 2;
+	            map.on('draw:toolbaropened', function(e){
+	                inDrawMode = true;
 	            });
-	            map.on('draw:deletestarted', function(e){
-	                var g = 1;
-	                var u = 2;
+	            map.on('draw:toolbarclosed', function(e){
+	                inDrawMode = false;
 	            });
 	        });
 	    }
@@ -7029,14 +7084,33 @@
 	    $scope.close = function () {
 	        $modalInstance.dismiss();
 	    };
-	    
-	    $scope.captureCoordinate = function(){
+	
+	    var internalCaptureCoordinate = function(){
 	        var geoJson = currentGeometryType.getGeoJson();
 	        if(!geoJson){
 	            NotificationService.showNotifcationDialog($translate.instant("warning"), $translate.instant("no_geometry_captured"));
 	        }
 	        $modalInstance.close(geoJson);
+	    }
+	    
+	    $scope.captureCoordinate = function(){
+	        
+	        if(inDrawMode) {
+	            var modalOptions = {
+	                closeButtonText: "Cancel",
+	                actionButtonText: 'OK',
+	                headerText: 'cancel_capturing_polygon',
+	                bodyText: 'you_are_currently_in_draw_mode_all_unfinished_changes_will_be_lost',
+	            };
+	            ModalService.showModal({},modalOptions).then(function(){
+	                internalCaptureCoordinate();
+	            }, function(){});
+	            return;
+	        }
+	        internalCaptureCoordinate();
 	    };
+	
+	
 	    
 	    function setDraggedMarker( args ){
 	        if( args ){
@@ -7334,7 +7408,7 @@
 /* 8 */
 /***/ (function(module, exports) {
 
-	angular.module('d2Templates', []).run(['$templateCache', function($templateCache) {$templateCache.put('./templates/age-input.html','<div ng-form="ageForm">\n    <div class="input-group" style="width: 100%; padding-top: 5px;">\n        <input type="text" \n               d2-date name="dob" \n               d2-date-validator\n               ng-model="age.dob"\n               blur-or-change="saveDOB()"\n               ng-required="d2Required"\n               ng-disabled="d2Disabled"\n               ng-attr-placeholder="{{\'dob\'| translate}}" \n               ng-attr-title="{{\'dob\'| translate}}" \n               class="form-control no-right-radius"\n               ng-class="{\'input-success\': d2AgeSaved}"/>\n        <span class="input-group-btn empty-span"></span>\n        <span class="has-float-label">\n            <input type="number" \n                   name="years"\n                   ng-model="age.years" \n                   ng-model-options="{updateOn: \'blur\'}"\n                   ng-change="saveAge()"\n                   ng-disabled="d2Disabled"\n                   d2-number-validator\n                   number-type="INTEGER_ZERO_OR_POSITIVE"\n                   ng-attr-placeholder="{{\'years\'| translate}}"\n                   ng-attr-title="{{\'years\'| translate}}" \n                   class="form-control no-right-radius no-left-radius"\n                   ng-class="{\'input-success\': d2AgeSaved}"\n                   id="year"/>\n            <label for="year">{{\'years\'| translate}}</label>\n        </span>\n        <span class="input-group-btn empty-span"></span>\n        <span class="has-float-label">\n            <input type="number" \n                   name="months"\n                   ng-model="age.months" \n                   ng-model-options="{updateOn: \'blur\'}"\n                   ng-change="saveAge()"\n                   ng-disabled="d2Disabled"\n                   d2-number-validator\n                   number-type="INTEGER_ZERO_OR_POSITIVE"\n                   ng-attr-placeholder="{{\'months\'| translate}}"\n                   ng-attr-title="{{\'months\'| translate}}" \n                   class="form-control no-right-radius no-left-radius"\n                   ng-class="{\'input-success\': d2AgeSaved}"\n                   id="month"/>\n            <label for="month">{{\'months\'| translate}}</label>\n        </span>\n        <span class="input-group-btn empty-span"></span>\n        <span class="has-float-label">\n            <input type="number" \n                   name="days"\n                   ng-model="age.days" \n                   ng-model-options="{updateOn: \'blur\'}"\n                   ng-change="saveAge()"\n                   ng-disabled="d2Disabled"\n                   d2-number-validator\n                   number-type="INTEGER_ZERO_OR_POSITIVE"\n                   ng-attr-placeholder="{{\'days\'| translate}}"\n                   ng-attr-title="{{\'days\'| translate}}" \n                   class="form-control no-left-radius no-right-radius"\n                   ng-class="{\'input-success\': d2AgeSaved}"\n                   id="day"/>\n            <label for="day">{{\'days\'| translate}}</label>\n        </span>\n        <span class="input-group-btn"> \n            <button class="btn btn-danger hideInPrint trim" type="button" ng-attr-title="{{\'remove\'| translate}}" ng-click="removeAge()" ng-disabled="!age.dob || d2Disabled"> \n                <i class="fa fa-trash-o"></i> \n            </button>\n        </span>\n    </div>\n    <div ng-messages="ageForm.dob.$error" ng-if="ageInteracted(ageForm.dob, outerDataEntryForm)" class="required" ng-messages-include="./templates/error-messages.html"></div>\n    <div ng-messages="ageForm.years.$error" ng-if="ageInteracted(ageForm.years, outerDataEntryForm)" class="required" ng-messages-include="./templates/error-messages.html"></div>\n    <div ng-messages="ageForm.months.$error" ng-if="ageInteracted(ageForm.months, outerDataEntryForm)" class="required" ng-messages-include="./templates/error-messages.html"></div>\n    <div ng-messages="ageForm.days.$error" ng-if="ageInteracted(ageForm.days, outerDataEntryForm)" class="required" ng-messages-include="./templates/error-messages.html"></div>\n</div>\n\n<style>\n    .has-float-label {\n    position: relative;\n    }\n    .has-float-label label {\n        position: absolute;\n        cursor: text;\n        font-size: 75%;\n        opacity: 1;\n        -webkit-transition: all .2s;\n        transition: all .2s;\n        top: -.5em;\n        left: 5px;\n        z-index: 3;\n        line-height: 1;\n        padding: 0 1px;\n    }\n    .has-float-label label::after {\n        content: " ";\n        display: block;\n        position: absolute;\n        height: 2px;\n        top: 50%;\n        left: -.2em;\n        right: -.2em;\n        z-index: -1;\n    }\n    .has-float-label .form-control::-webkit-input-placeholder {\n        opacity: 1;\n        -webkit-transition: all .2s;\n        transition: all .2s;\n    }\n    .has-float-label .form-control:placeholder-shown:not(:focus)::-webkit-input-placeholder {\n        opacity: 1;\n    }\n    .has-float-label .form-control:placeholder-shown:not(:focus)+label {\n        pointer-events: none;\n        font-size: 14px;\n        opacity: 0;\n        top: 1em;\n        font-weight: 400;\n    }\n    .input-group .has-float-label {\n        display: table-cell;\n    }\n    .input-group .has-float-label .form-control {\n        border-radius: 4px;\n    }\n    .input-group .has-float-label:not(:last-child) .form-control {\n        border-bottom-right-radius: 0;\n        border-top-right-radius: 0;\n    }\n    .input-group .has-float-label:not(:first-child) .form-control {\n        border-bottom-left-radius: 0;\n        border-top-left-radius: 0;\n        margin-left: -1px;\n    }\n</style>');
+	angular.module('d2Templates', []).run(['$templateCache', function($templateCache) {$templateCache.put('./templates/age-input.html','<div ng-form="ageForm">\n    <div class="input-group" style="width: 100%; padding-top: 5px;">\n        <input type="text" \n               d2-date name="dob" \n               d2-date-validator\n               ng-model="age.dob"\n               blur-or-change="saveDOB()"\n               ng-required="d2Required"\n               ng-disabled="d2Disabled"\n               ng-attr-placeholder="{{\'dob\'| translate}}" \n               ng-attr-title="{{\'dob\'| translate}}" \n               class="form-control no-right-radius"\n               ng-class="{\'input-success\': d2AgeSaved}"/>\n        <span class="input-group-btn empty-span"></span>\n        <span class="has-float-label">\n            <input type="number" \n                   name="years"\n                   ng-model="age.years" \n                   ng-model-options="{updateOn: \'blur\'}"\n                   ng-change="saveAge()"\n                   ng-disabled="d2Disabled"\n                   d2-number-validator\n                   number-type="INTEGER_ZERO_OR_POSITIVE"\n                   ng-attr-placeholder="{{\'years\'| translate}}"\n                   ng-attr-title="{{\'years\'| translate}}" \n                   class="form-control no-right-radius no-left-radius"\n                   ng-class="{\'input-success\': d2AgeSaved}"\n                   id="year"/>\n            <label for="year">{{\'years\'| translate}}</label>\n        </span>\n        <span class="input-group-btn empty-span"></span>\n        <span class="has-float-label">\n            <input type="number" \n                   name="months"\n                   ng-model="age.months" \n                   ng-model-options="{updateOn: \'blur\'}"\n                   ng-change="saveAge()"\n                   ng-disabled="d2Disabled"\n                   d2-number-validator\n                   number-type="INTEGER_ZERO_OR_POSITIVE"\n                   ng-attr-placeholder="{{\'months\'| translate}}"\n                   ng-attr-title="{{\'months\'| translate}}" \n                   class="form-control no-right-radius no-left-radius"\n                   ng-class="{\'input-success\': d2AgeSaved}"\n                   id="month"/>\n            <label for="month">{{\'months\'| translate}}</label>\n        </span>\n        <span class="input-group-btn empty-span"></span>\n        <span class="has-float-label">\n            <input type="number" \n                   name="days"\n                   ng-model="age.days" \n                   ng-model-options="{updateOn: \'blur\'}"\n                   ng-change="saveAge()"\n                   ng-disabled="d2Disabled"\n                   d2-number-validator\n                   number-type="INTEGER_ZERO_OR_POSITIVE"\n                   ng-attr-placeholder="{{\'days\'| translate}}"\n                   ng-attr-title="{{\'days\'| translate}}" \n                   class="form-control no-left-radius no-right-radius"\n                   ng-class="{\'input-success\': d2AgeSaved}"\n                   id="day"/>\n            <label for="day">{{\'days\'| translate}}</label>\n        </span>\n        <span class="input-group-btn"> \n            <button class="btn btn-danger hideInPrint trim" type="button" ng-attr-title="{{\'remove\'| translate}}" ng-click="removeAge()" ng-disabled="!age.dob || d2Disabled"> \n                <i class="fa fa-trash-o"></i> \n            </button>\n        </span>\n    </div>\n    <div ng-messages="ageForm.dob.$error" ng-if="ageInteracted(ageForm.dob, outerDataEntryForm)" class="required" ng-messages-include="./templates/error-messages.html"></div>\n    <div ng-messages="ageForm.years.$error" ng-if="ageInteracted(ageForm.years, outerDataEntryForm)" class="required" ng-messages-include="./templates/error-messages.html"></div>\n    <div ng-messages="ageForm.months.$error" ng-if="ageInteracted(ageForm.months, outerDataEntryForm)" class="required" ng-messages-include="./templates/error-messages.html"></div>\n    <div ng-messages="ageForm.days.$error" ng-if="ageInteracted(ageForm.days, outerDataEntryForm)" class="required" ng-messages-include="./templates/error-messages.html"></div>\n</div>');
 	$templateCache.put('./templates/audit-history.html','<div class="modal-header">\n    <h2>{{\'audit_history\'| translate}}</h2>\n</div>\n<div class="modal-body page" ng-class="{\'waiting-box\':model.showStatus === \'waiting\'}">\n    <div ng-if="model.showStatus === \'data_available\'">\n        <span class="row">\n            <input class="form-control col-md-7" ng-model="model.searchText" ng-attr-placeholder="{{model.searchPlaceholder}}" type="search" />\n        </span>\n        <div class="scroll">\n            <table class="listTable dhis2-table-striped-border">\n                <thead>\n                    <tr>\n                        <th ng-repeat="col in model.auditColumns">\n                            <span ng-switch="col">\n                                <span ng-switch-when="name">\n                                    {{model.name}}\n                                </span>\n                                <span ng-switch-default>\n                                \t{{col | translate}}\n                                </span>                                    \n                            </span>\n                        </th>\n                    </tr>\n                </thead>\n                <tbody ng-repeat="row in model.uniqueRows">\n                    <tr ng-repeat="item in model.itemList | orderBy: \'created\':reverse | filter: {name: row} | filter: {name: model.searchText}" ng-init="rowIndex = $index">\n                        <td ng-repeat="col in model.auditColumns"\n                            rowspan="{{(model.itemList | filter: {name: row} | filter: model.searchText).length}}"\n                            ng-if="col === \'name\' && rowIndex === 0">\n                            {{item[col]}}\n                        </td>\n                        <td class="wrap-text" ng-repeat="col in model.auditColumns" ng-if="col !== \'name\'">\n                        \t<span ng-if="col === \'value\'">\n                        \t\t<span ng-switch="item.valueType">\n\t\t\t\t                    <span ng-switch-when="BOOLEAN">\n\t\t\t\t                        <span ng-if="item[col] === \'true\'">{{\'yes\'| translate}}</span>\n\t\t\t\t                        <span ng-if="item[col] === \'false\'">{{ \'no\' | translate}}</span>\n\t\t\t\t                    </span>\n\t\t\t\t                    <span ng-switch-when="TRUE_ONLY">\n\t\t\t\t                        <span ng-if="item[col]">\n\t\t\t\t                            <i class="fa fa-check"></i>\n\t\t\t\t                        </span>\n\t\t\t\t                    </span>\n\t\t\t\t                    <span ng-switch-default>{{item[col]}}</span>\n\t\t\t\t                </span>\n                        \t</span>\n                        \t<span ng-if="col !== \'value\'">\n                        \t\t{{item[col]}}\n                        \t</span>\n                        \t                            \n                        </td>\n                    </tr>\n                </tbody>\n            </table>\n        </div>\n    </div>\n    <div ng-if="model.showStatus === \'data_unavailable\'">\n        <div class="alert alert-warning">{{\'audit_history_unavailable\'| translate}}</div>\n    </div>\n    <div ng-if="model.showStatus === \'waiting\'">\n        <i class="fa fa-spinner fa-spin audit-spinner"></i>\n        <div class="loading-audit-data">{{\'loading-audit-data\' | translate}}</div>\n    </div>\n</div>\n<div class="modal-footer" ng-if="model.showStatus !== \'waiting\'">\n    <button type="button" class="btn btn-default" data-ng-click="close()">{{\'close\'| translate}}</button>\n</div>');
 	$templateCache.put('./templates/coordinate-input.html','<div  ng-form="coordinateForm">\n    <div class="input-group">\n        <input type="number" \n               ng-model="coordinateObject.coordinate.latitude" \n               ng-attr-placeholder="{{\'latitude\'| translate}}"\n               ng-class="{\'input-success\': d2LatSaved}"\n               name="latitude" \n               d2-coordinate-validator\n               ng-required="d2Required"\n               ng-disabled="d2Disabled"\n               ng-blur="saveD2Coordinate()"\n               class="form-control no-right-radius"/>\n        <span class="input-group-btn empty-span"></span>\n        <input type="number" \n               ng-model="coordinateObject.coordinate.longitude" \n               ng-attr-placeholder="{{\'longitude\'| translate}}"\n               ng-class="{\'input-success\': d2LngSaved}"\n               name="longitude" \n               d2-coordinate-validator\n               ng-required="d2Required"\n               ng-disabled="d2Disabled"\n               ng-blur="saveD2Coordinate()"\n               class="form-control no-left-radius no-right-radius"/>\n        <span class="input-group-btn hideInPrint">\n            <button class="btn btn-grp trim hideInPrint" \n                    type="button"\n                    ng-disabled="{{d2Disabled}}"\n                    ng-attr-title="{{\'get_from_map\'| translate}}"\n                    ng-click="showMap(coordinateObject)"> \n                <i class="fa fa-map-marker"></i>                             \n            </button>\n        </span>    \n    </div>\n    <div ng-messages="coordinateForm.latitude.$error" ng-if="coordinateInteracted(coordinateForm.latitude)" class="required" ng-messages-include="./templates/error-messages.html"></div>\n    <div ng-messages="coordinateForm.longitude.$error" ng-if="coordinateInteracted(coordinateForm.longitude)" class="required" ng-messages-include="./templates/error-messages.html"></div>\n</div>');
 	$templateCache.put('./templates/custom-dataentry-form.html','<d2-custom-data-entry-form custom-data-entry-form="customDataEntryForm"></d2-custom-data-entry-form>');
@@ -7344,9 +7418,9 @@
 	$templateCache.put('./templates/geometry-input-point.html','<div ng-form="geometryForm">\n    <div class="input-group">\n        <input type="number" \n               ng-model="geometry.coordinate.latitude" \n               ng-attr-placeholder="{{\'latitude\'| translate}}"\n               ng-class="{\'input-success\': d2LatSaved}"\n               name="latitude" \n               d2-coordinate-validator\n               ng-required="d2Required"\n               ng-disabled="d2Disabled"\n               ng-blur="updateLatLng(geometryForm)"\n               class="form-control no-right-radius"/>\n        <span class="input-group-btn empty-span"></span>\n        <input type="number" \n               ng-model="geometry.coordinate.longitude" \n               ng-attr-placeholder="{{\'longitude\'| translate}}"\n               ng-class="{\'input-success\': d2LngSaved}"\n               name="longitude" \n               d2-coordinate-validator\n               ng-required="d2Required"\n               ng-disabled="d2Disabled"\n               ng-blur="updateLatLng(geometryForm)"\n               class="form-control no-left-radius no-right-radius"/>\n        <span class="input-group-btn hideInPrint">\n            <button class="btn btn-grp trim hideInPrint" \n                    type="button"\n                    ng-disabled="{{d2Disabled}}"\n                    ng-attr-title="{{\'get_from_map\'| translate}}"\n                    ng-click="showMap()"> \n                <i class="fa fa-map-marker"></i>                             \n            </button>\n        </span>    \n    </div>\n    <div ng-messages="geometryForm.latitude.$error" ng-if="geometryForm.$submitted || geometryForm.latitude.$dirty" class="required" ng-messages-include="./templates/error-messages.html"></div>\n    <div ng-messages="geometryForm.longitude.$error" ng-if="geometryForm.$submitted || geometryForm.longitude.$dirty" class="required" ng-messages-include="./templates/error-messages.html"></div>\n</div>');
 	$templateCache.put('./templates/geometry-input-polygon.html','<div>\n    <div class="input-group">\n        <div class="geometry-polygon-indicator">{{polygonIndicator}}<span ng-show="hasPolygon" style="margin-left:2px;color:green" class="fa fa-check"></span></div>\n        <span class="input-group-btn hideInPrint">\n            <button class="btn btn-grp trim hideInPrint" \n                    type="button"\n                    ng-disabled="{{d2Disabled}}"\n                    ng-attr-title="{{\'get_from_map\'| translate}}"\n                    ng-click="showMap()"> \n                <i class="fa fa-map-marker"></i>                             \n            </button>\n        </span>    \n    </div>\n</div>');
 	$templateCache.put('./templates/geometry-input.html','<div ng-include="currentGeometryTypeDefinition.template"></div>');
-	$templateCache.put('./templates/img-input.html','<div style="margin-top: 5px; margin-bottom: 5px;">\n    <accordion>\n        <accordion-group is-open="d2DisplayOpen">\n            <accordion-heading>\n                <span ng-if="!d2Event[d2DataElementId]"> {{\'please_select_an_image\'| translate}} <i class="pull-right" ng-class="{\'fa fa-chevron-up vertical-center\': d2DisplayOpen, \'fa fa-chevron-down vertical-center\': !d2DisplayOpen}"></i></span>\n                <span ng-if="d2Event[d2DataElementId]"> {{d2FileNames[d2Event.event][d2DataElementId].length > 20 ? d2FileNames[d2Event.event][d2DataElementId].substring(0,20).concat(\'...\') : d2FileNames[d2Event.event][d2DataElementId]}} <i class="pull-right" ng-class="{\'fa fa-chevron-up vertical-center\': d2DisplayOpen, \'fa fa-chevron-down vertical-center\': !d2DisplayOpen}"></i></span>\n            </accordion-heading>\n            <div class="preview clearfix" ng-if="d2Event[d2DataElementId]">\n                <div class="previewData clearfix" ng-init="fetch()">\n                    <img ng-if="!d2HideImage" class="img" ng-src={{path}} style="max-width:100%;"></img>\n                </div>\t\n            </div>\n            <div ng-if="!d2Event[d2DataElementId]">\n                <div class="form-group inputDnD">\n                    <input type="file"\n                           name="foo"\n                           ng-disabled="d2Disabled"\n                           input-field-id={{d2DataElementId}}\n                           d2-file-input-ps="d2Ps"\n                           d2-file-input="d2Event"\n                           d2-file-input-current-name="d2CurrentImageName"\n                           d2-file-input-name="d2FileNames"\n                           accept="image/*"\n                           class="form-control-file text-primary font-weight-bold"\n                           id="inputFile"\n                           data-title="{{\'drop_image\'| translate}}">\n                </div>\n            </div>\n            <div class="input-group" ng-show="d2CanEdit" style="margin-top: 5px;">\n                <div class="form-control">\n                    <a href ng-click="d2IsAttribute ? d2DownloadMethode(d2Tei, d2DataElementId) : d2DownloadMethode(d2Event.event, d2DataElementId)" ng-attr-title="{{d2FileNames[d2Event.event][d2DataElementId]}}">{{d2FileNames[d2Event.event][d2DataElementId].length > 20 ? d2FileNames[d2Event.event][d2DataElementId].substring(0,20).concat(\'...\') : d2FileNames[d2Event.event][d2DataElementId]}}</a>\n                </div>\n                <span class="input-group-btn">\n                    <span class="btn btn-grp btn-file" ng-click="delete()" ng-disabled="d2Disabled" ng-if="d2Event[d2DataElementId]" style="border-top-left-radius: 0px; border-bottom-left-radius: 0px;">\n                        <span ng-attr-title="{{\'delete\' | translate}}"\n                              d2-file-input-name="d2FileNames[d2Event.event][d2DataElementId]"\n                              d2-file-input-delete="d2Event[d2DataElementId]">\n                            <i class="fa fa-trash"></i>\n                        </span>\n                    </span>\n                    <span class="btn btn-grp btn-file" ng-if="!d2Event[d2DataElementId]" style="border-top-left-radius: 0px; border-bottom-left-radius: 0px;">\n                        <span ng-attr-title="{{\'upload\' | translate}}">\n                            <i class="fa fa-upload"></i>\n                            <input type="file"\n                                    ng-required="d2Required"\n                                    ng-disabled="d2Disabled"\n                                    name="foo"\n                                    input-field-id={{d2DataElementId}}\n                                    d2-file-input-ps="d2Ps"\n                                    d2-file-input="d2Event"\n                                    d2-file-input-current-name="d2CurrentImageName"\n                                    d2-file-input-name="d2FileNames"\n                                    accept="image/*">\n                        </span>\n                    </span>\n                </span>\n                <span class="input-group-btn">\n                    <button type="button" class="btn btn-default" ng-disabled="!d2Event[d2DataElementId]" ng-click="fetch()" style="border-radius: 4px; margin-left: 10px;">\n                        <i class="fa fa-refresh" aria-hidden="true"></i>\n                    </button>\n                </span>\n            </div>               \n        </accordion-group> \n    </accordion>\n</div>\n\n<style>\n    .inputDnD .form-control-file {\n        position: relative;\n        width: 100%;\n        height: 100%;\n        min-height: 6em;\n        outline: none;\n        visibility: hidden;\n        cursor: pointer;\n        background-color: #c61c23;\n        box-shadow: 0 0 5px solid currentColor;\n    }\n    .inputDnD .form-control-file:before {\n        content: attr(data-title);\n        position: absolute;\n        top: 0.5em;\n        left: 0;\n        width: 100%;\n        min-height: 6em;\n        line-height: 2em;\n        padding-top: 1.5em;\n        opacity: 1;\n        visibility: visible;\n        text-align: center;\n        border: 0.15em dashed currentColor;\n        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);\n        overflow: hidden;\n        border-top-left-radius: 15px;\n        border-top-right-radius: 15px;\n        border-bottom-left-radius: 15px;\n        border-bottom-right-radius: 15px;\n    }\n    .inputDnD .form-control-file:hover:before {\n        border-style: solid;\n        box-shadow: inset 0px 0px 0px 0.05em currentColor;\n        border-bottom-right-radius: 15px;\n        border-top-right-radius: 15px;\n        border-bottom-left-radius: 15px;\n        border-top-left-radius: 15px;\n    }\n</style>');
+	$templateCache.put('./templates/img-input.html','<div style="margin-top: 5px; margin-bottom: 5px;">\n    <accordion>\n        <accordion-group is-open="d2DisplayOpen">\n            <accordion-heading>\n                <span ng-if="!d2Event[d2DataElementId]"> {{\'please_select_an_image\'| translate}} <i class="pull-right" ng-class="{\'fa fa-chevron-up vertical-center\': d2DisplayOpen, \'fa fa-chevron-down vertical-center\': !d2DisplayOpen}"></i></span>\n                <span ng-if="d2Event[d2DataElementId]"> {{d2FileNames[d2Event.event][d2DataElementId].length > 20 ? d2FileNames[d2Event.event][d2DataElementId].substring(0,20).concat(\'...\') : d2FileNames[d2Event.event][d2DataElementId]}} <i class="pull-right" ng-class="{\'fa fa-chevron-up vertical-center\': d2DisplayOpen, \'fa fa-chevron-down vertical-center\': !d2DisplayOpen}"></i></span>\n            </accordion-heading>\n            <div class="preview clearfix" ng-if="d2Event[d2DataElementId]">\n                <div class="previewData clearfix" ng-init="fetch()">\n                    <img ng-if="!d2HideImage" class="img" ng-src={{path}} style="max-width:100%;"></img>\n                </div>\t\n            </div>\n            <div ng-if="!d2Event[d2DataElementId]">\n                <div class="form-group inputDnD">\n                    <input type="file"\n                           name="foo"\n                           ng-disabled="d2Disabled"\n                           input-field-id={{d2DataElementId}}\n                           d2-file-input-ps="d2Ps"\n                           d2-file-input="d2Event"\n                           d2-file-input-current-name="d2CurrentImageName"\n                           d2-file-input-name="d2FileNames"\n                           accept="image/*"\n                           class="form-control-file text-primary font-weight-bold"\n                           id="inputFile"\n                           data-title="{{\'drop_image\'| translate}}">\n                </div>\n            </div>\n            <div class="input-group" ng-show="d2CanEdit" style="margin-top: 5px;">\n                <div class="form-control">\n                    <a href ng-click="d2IsAttribute ? d2DownloadMethode(d2Tei, d2DataElementId) : d2DownloadMethode(d2Event.event, d2DataElementId)" ng-attr-title="{{d2FileNames[d2Event.event][d2DataElementId]}}">{{d2FileNames[d2Event.event][d2DataElementId].length > 20 ? d2FileNames[d2Event.event][d2DataElementId].substring(0,20).concat(\'...\') : d2FileNames[d2Event.event][d2DataElementId]}}</a>\n                </div>\n                <span class="input-group-btn">\n                    <span class="btn btn-grp btn-file" ng-click="delete()" ng-disabled="d2Disabled" ng-if="d2Event[d2DataElementId]" style="border-top-left-radius: 0px; border-bottom-left-radius: 0px;">\n                        <span ng-attr-title="{{\'delete\' | translate}}"\n                              d2-file-input-name="d2FileNames[d2Event.event][d2DataElementId]"\n                              d2-file-input-delete="d2Event[d2DataElementId]">\n                            <i class="fa fa-trash"></i>\n                        </span>\n                    </span>\n                    <span class="btn btn-grp btn-file" ng-if="!d2Event[d2DataElementId]" style="border-top-left-radius: 0px; border-bottom-left-radius: 0px;">\n                        <span ng-attr-title="{{\'upload\' | translate}}">\n                            <i class="fa fa-upload"></i>\n                            <input type="file"\n                                    ng-required="d2Required"\n                                    ng-disabled="d2Disabled"\n                                    name="foo"\n                                    input-field-id={{d2DataElementId}}\n                                    d2-file-input-ps="d2Ps"\n                                    d2-file-input="d2Event"\n                                    d2-file-input-current-name="d2CurrentImageName"\n                                    d2-file-input-name="d2FileNames"\n                                    accept="image/*">\n                        </span>\n                    </span>\n                </span>\n                <span class="input-group-btn">\n                    <button type="button" class="btn btn-default" ng-disabled="!d2Event[d2DataElementId]" ng-click="fetch()" style="border-radius: 4px; margin-left: 10px;">\n                        <i class="fa fa-refresh" aria-hidden="true"></i>\n                    </button>\n                </span>\n            </div>               \n        </accordion-group> \n    </accordion>\n</div>');
 	$templateCache.put('./templates/map.html','<div class="modal-header">\n    <h2>\n        {{\'point_and_click_for_coordinate\'| translate}}        \n    </h2>\n    <div class="align-center">\n        <span id=\'polygon-label\'></span>\n    </div>\n</div>\n<div class="modal-body map-area">\n    <span ng-switch="selectedTileKey">        \n        <span ng-switch-when="openstreetmap">\n            <leaflet id="openstreetmap" lf-center="center" defaults="mapDefaults" markers="marker" tiles="tilesDictionary[selectedTileKey]"></leaflet>\n        </span>\n        <span ng-switch-when="googlemap">\n            <leaflet id="googlemap" lf-center="center" defaults="mapDefaults" markers="marker" layers="tilesDictionary[selectedTileKey].layers"></leaflet>\n        </span>\n    </span>\n</div>\n<div class="modal-footer">\n    \n    <div class="pull-left">\n        <ul class="nav nav-pills">\n            <li ng-class="{true: \'active\'} [selectedTileKey === key]" ng-repeat="key in tilesDictionaryKeys">\n                <a href ng-click="setTile(key)">{{key | translate}}</a>\n            </li>\n        </ul>\n    </div>\n    \n    <button class="btn btn-primary" data-ng-click="captureCoordinate()">{{\'capture\'| translate}}</button>\n    <button class="btn btn-default" data-ng-click="close()">{{\'cancel\'| translate}}</button>        \n</div>');
-	$templateCache.put('./templates/more-options-list.html','    <ui-select ng-model="d2Model[d2ModelId]"\n               theme="select2"\n               ng-required="d2Required"\n               ng-disabled="d2Disabled"\n               name="foo"\n               on-select="saveOption()"\n               class="ui-select-style">\n        <ui-select-match allow-clear="true" ng-class="d2UseNotification ? getInputNotifcationClass(d2ModelId) : \'\';"  class="form-control-ui-select"  ng-attr-placeholder="{{\'select_or_search\' | translate}}">{{$select.selected.displayName  || $select.selected}}</ui-select-match>\n        <ui-select-choices repeat="option.displayName as option in displayOptions" ui-disable-choice="option.id===loadMoreId" refresh="search($select.search)" refresh-delay="500">\n            <span ng-if="option.id!==loadMoreId" ng-bind-html="option.displayName | highlight: $select.search"></span>\n            <div ng-if="option.id===loadMoreId">\n                <button class="btn btn-xs btn-default" \n                        style="width: 100%; margin-top: 5px;" \n                        ng-click="showMore($select, $event);"\n                        ng-disabled="loading">{{\'show_more\' | translate}}</button>                              \n              </div>\n        </ui-select-choices>\n    </ui-select>');
+	$templateCache.put('./templates/more-options-list.html','<div class="optionListContainer">\n    <div ng-if="d2Disabled"><input class="form-control" ng-model="d2Model[d2ModelId]" disabled></div>\n    <div ng-click="toggleOptionList()" ng-if="!d2Disabled" class="optionListInput" ng-class="{ \'optionListInputOpen\': optionListOpen }">\n        <div class="optionListInputText" >\n            <span ng-if="d2Model[d2ModelId]">{{d2Model[d2ModelId]}}</span>\n            <span ng-if="!d2Model[d2ModelId]" class="optionListInputTextPlaceholder">{{\'select_or_search\' | translate}}</span>\n        </div>\n        <div class="optionListInputDelete" ng-click="removeSelectedOption($event)"><i class="fa fa-times" ng-if="d2Model && d2Model[d2ModelId]"></i></div>\n        <div class="optionListInputToggle"><i class="fa fa-caret-up" ng-show="optionListOpen"></i><i class="fa fa-caret-down" ng-hide="optionListOpen"></i></div>\n    </div>\n    <div ng-if="optionListOpen" class="optionListPopup">\n        <div class="optionListSearchInputContainer">\n            <input type="text" class="form-control" ng-model="searchText" ng-change="search(searchText)" ng-model-options="{ debounce: 600 }" placeholder="Search..."/>\n        </div>\n        <div vs-repeat class="optionListVsRepeater">\n            <div ng-repeat="option in displayOptions track by option.id" class="optionListItem" ng-click="selectOption(option)" ng-class="{ \'optionListItemSelected\': (option.displayName===d2Model[d2ModelId])}">\n                {{option.displayName}}\n            </div>\n        </div>\n    </div>\n</div>\n');
 	$templateCache.put('./templates/orgunit-input.html','<div class="input-group">    \n    <input type="text" name="foo" ng-disabled="true" class="form-control" ng-attr-placeholder="{{\'please_select\' | translate}}" ng-model="d2OrgunitNames[d2Object[id]]" ng-disabled="{{d2Disabled}}" ng-required="{{d2Required}}"> \n    <span class="input-group-btn"> \n        <button class="btn btn-danger hideInPrint trim" type="button" ng-attr-title="{{\'remove\' | translate}}" ng-disabled="d2Disabled" ng-click="removeSelectedOrgUnit(id)" ng-if="d2Object[id]"> \n            <i class="fa fa-trash-o"></i> \n        </button> \n        <button class="btn btn-default hideInPrint trim" type="button" ng-attr-title="{{\'get_from_tree\' | translate}}" ng-disabled="d2Disabled" ng-click="showOrgUnitTree(id)"> \n            <i class="fa fa-plus-square-o"></i> \n        </button> \n    </span> \n</div>');
 	$templateCache.put('./templates/orgunit-tree.html','<div class="modal-header page">\n    <h3>{{\'org_unit\'| translate}}</h3>\n</div>\n<div class="modal-body page">\n    <div class="input-group">    \n        <input type="text" \n            name="orgUnitFilterText" \n            d2-on-enter-blur\n            d2-on-blur-change="filterOrgUnits()"\n            ng-model="orgUnitFilterText" \n            class="form-control" ng-attr-placeholder="{{\'search\' | translate}}"> \n        <span class="input-group-btn"> \n            <button class="btn btn-success hideInPrint trim" type="button" ng-attr-title="{{\'search\' | translate}}" ng-disabled="!orgUnitFilterText" ng-click="filterOrgUnits()"> \n                <i class="fa fa-search"></i> \n            </button> \n            <button class="btn btn-danger hideInPrint trim" type="button" ng-attr-title="{{\'clear\' | translate}}" ng-disabled="!orgUnitFilterText" ng-click="filterOrgUnits(true)"> \n                <i class="fa fa-trash-o"></i>\n            </button> \n        </span> \n    </div>\n    <div class="org-unit-tree" data-stop-propagation="true">\n        <script type="text/ng-template" id="orgUnitTree.html">\n            <span class="org-unit-tree-button" ng-click="expandCollapse(orgUnit)" ng-show="orgUnit.show && orgUnit.children.length > 0"><i class="fa fa-minus-square-o"></i></span>\n            <span class="org-unit-tree-button" ng-click="expandCollapse(orgUnit)" ng-show="(!orgUnit.show && orgUnit.children.length > 0) || (!orgUnit.show && orgUnit.hasChildren)"><i class="fa fa-plus-square-o"></i></span>\n            <span class="org-unit-tree-button" ng-click="setSelectedOrgUnit(orgUnit)" ng-class="{\'selected-org-unit\' : orgUnit.id === model.selectedOrgUnitId}">{{orgUnit.displayName}}</span>\n            <ul class="tree" id="tree" ng-show="orgUnit.show">\n                <li ng-repeat="orgUnit in orgUnit.children | orderBy:[\'level\',\'displayName\']" ng-include="\'orgUnitTree.html\'"></li>\n            </ul>\n        </script>\n        <ul class="tree" id="tree">\n            <li ng-repeat="orgUnit in orgUnitsDataElement | orderBy:[\'level\',\'displayName\']" ng-include="\'orgUnitTree.html\'"></li>\n        </ul>\n    </div>\n</div>\n<div class="modal-footer page">\n    <button class="btn btn-primary" data-ng-click="select()">{{\'select\'| translate}}</button>\n    <button class="btn btn-default" data-ng-click="close()">{{\'close\'| translate}}</button>\n</div>');
 	$templateCache.put('./templates/radio-button.html','<!--\nCopyright (c) 2015, UiO\nAll rights reserved.\n\nRedistribution and use in source and binary forms, with or without\nmodification, are permitted provided that the following conditions are met:\n\n* Redistributions of source code must retain the above copyright notice, this\n  list of conditions and the following disclaimer.\n* Redistributions in binary form must reproduce the above copyright notice,\n  this list of conditions and the following disclaimer in the documentation\n  and/or other materials provided with the distribution.\n\nTHIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"\nAND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE\nIMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE\nARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE\nLIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR\nCONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF\nSUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS\nINTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN\nCONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)\nARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE\nPOSSIBILITY OF SUCH DAMAGE.\n-->\n \n\n<div tabindex="0" ng-if="!disabled" class="custom-radio-group custom-radio-container">\n    <span ng-click="valueClicked(\'true\')" class="cursor-pointer">\n        <span class="fa-stack">                                                                                                        \n            <span class=\'fa fa-stack-1x fa-circle radio-default fa-stack-custom-large\' ng-class=\'radioButtonColor("true")\'></span>        \n            <span class="fa fa-stack-1x fa-circle-thin fa-stack-custom-large"></span>\n            <span class="fa-stack-custom-small" ng-class="radioButtonImage(\'true\')"></span>\n        </span>\n        <span class="custom-radio-text">\n            {{\'Yes\' | translate }}\n        </span>\n    </span>\n    &nbsp;&nbsp;    \n    <span ng-click="valueClicked(\'false\')" class="cursor-pointer">\n        <span class="fa-stack">                                                                                                        \n            <span class=\'fa fa-stack-1x fa-circle fa-stack-custom-large\' ng-class=\'radioButtonColor("false")\'></span>                                                    \n            <span class="fa fa-stack-1x fa-circle-thin fa-stack-custom-large"></span>\n            <span class="fa-stack-custom-small" ng-class="radioButtonImage(\'false\')"></span>\n        </span>\n        <span class="custom-radio-text">\n            {{\'No\' | translate }}\n        </span>        \n    </span>\n    <div ng-if="status === \'error\'" class="custom-radio-error input-error"><span>{{\'save failed\' | translate}}</span></div>\n    \n    \n    <div ng-show="false">\n        <label class="radio-inline">                                                    \n            <input class="radio-display-none" ng-required="required" style=\'margin-top: 1px\' type="radio" ng-model="value" ng-disabled="disabled" name="{{name}}" ng-attr-value="true">                                                    \n        </label>                                                \n        <label class="radio-inline">\n            <input class="radio-display-none" ng-required="required" style=\'margin-top: 1px\' type="radio" ng-model="value" ng-disabled="disabled" name="{{name}}" ng-attr-value="false">\n        </label>\n    </div>\n</div>\n<div ng-if="disabled" class="custom-radio-container">\n    <span class="fa-icon-width" ng-class="getDisabledIcon(value)"></span>\n    <span>{{getDisabledValue(value) | translate}}</span>         \n</div>');
@@ -7358,6 +7432,354 @@
 
 /***/ }),
 /* 9 */
+/***/ (function(module, exports, __webpack_require__) {
+
+	// style-loader: Adds some css to the DOM by adding a <style> tag
+	
+	// load the styles
+	var content = __webpack_require__(10);
+	if(typeof content === 'string') content = [[module.id, content, '']];
+	// add the styles to the DOM
+	var update = __webpack_require__(12)(content, {});
+	if(content.locals) module.exports = content.locals;
+	// Hot Module Replacement
+	if(false) {
+		// When the styles change, update the <style> tags
+		if(!content.locals) {
+			module.hot.accept("!!../../../css-loader/index.js!./style.css", function() {
+				var newContent = require("!!../../../css-loader/index.js!./style.css");
+				if(typeof newContent === 'string') newContent = [[module.id, newContent, '']];
+				update(newContent);
+			});
+		}
+		// When the module is disposed, remove the <style> tags
+		module.hot.dispose(function() { update(); });
+	}
+
+/***/ }),
+/* 10 */
+/***/ (function(module, exports, __webpack_require__) {
+
+	exports = module.exports = __webpack_require__(11)();
+	// imports
+	
+	
+	// module
+	exports.push([module.id, "\n.optionListContainer {\n    position: relative;\n}\n\n.optionListInput {\n    width: 100%;\n    height: 34px;\n    display: flex;\n    border-radius: 4px;\n    border: 1px solid #aaa;\n    background-color: white;\n    cursor: pointer;\n}\n.optionListInputTextPlaceholder {\n    color: grey;\n}\n.optionListInputOpen {\n    border-bottom-left-radius: 0px;\n    border-bottom-right-radius: 0px;\n}\n.optionListInputText {\n    flex-grow: 1;\n    line-height: 34px;\n    padding-left: 5px;\n    font-size: 14px;\n    overflow: hidden;\n    white-space: nowrap;\n    text-overflow: ellipsis;\n}\n.optionListInputDelete {\n    padding-right: 5px;\n    padding-left: 5px;\n    line-height: 34px;\n}\n.optionListInputToggle {\n    background-color: #ccc;\n    border-left: 1px solid #aaa;\n    width:18px;\n    line-height: 34px;\n    padding-left: 4px;\n}\n.optionListPopup {\n    position: absolute;\n    background-color:white;\n    border:1px solid #aaa;\n    border-top: none;\n    border-bottom-left-radius: 4px;\n    border-bottom-right-radius: 4px;\n    z-index: 100;\n    width: 100%;\n    box-shadow: 0px 0px 2px 0px #aaa;\n    user-select: none;\n}\n.optionListSearchInputContainer {\n    padding:5px;\n}\n.optionListItem {\n    height:30px;\n    line-height:30px;\n    padding-left:5px;\n    padding-right: 5px;\n    width: 100%;\n    overflow: hidden;\n    white-space: nowrap;\n    text-overflow: ellipsis;\n    cursor: pointer;\n}\n.optionListItemSelected {\n    background-color: lightgray;\n}\n.optionListItem:hover {\n    background-color: lightgray;\n}\n.optionListVsRepeater {\n    max-height:200px;\n    width: 100%;\n    overflow: auto;\n}\n\n.inputDnD .form-control-file {\n    position: relative;\n    width: 100%;\n    height: 100%;\n    min-height: 6em;\n    outline: none;\n    visibility: hidden;\n    cursor: pointer;\n    background-color: #c61c23;\n    box-shadow: 0 0 5px solid currentColor;\n}\n.inputDnD .form-control-file:before {\n    content: attr(data-title);\n    position: absolute;\n    top: 0.5em;\n    left: 0;\n    width: 100%;\n    min-height: 6em;\n    line-height: 2em;\n    padding-top: 1.5em;\n    opacity: 1;\n    visibility: visible;\n    text-align: center;\n    border: 0.15em dashed currentColor;\n    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);\n    overflow: hidden;\n    border-top-left-radius: 15px;\n    border-top-right-radius: 15px;\n    border-bottom-left-radius: 15px;\n    border-bottom-right-radius: 15px;\n}\n.inputDnD .form-control-file:hover:before {\n    border-style: solid;\n    box-shadow: inset 0px 0px 0px 0.05em currentColor;\n    border-bottom-right-radius: 15px;\n    border-top-right-radius: 15px;\n    border-bottom-left-radius: 15px;\n    border-top-left-radius: 15px;\n}\n\n.has-float-label {\n    position: relative;\n}\n.has-float-label label {\n    position: absolute;\n    cursor: text;\n    font-size: 75%;\n    opacity: 1;\n    -webkit-transition: all .2s;\n    transition: all .2s;\n    top: -.5em;\n    left: 5px;\n    z-index: 3;\n    line-height: 1;\n    padding: 0 1px;\n}\n.has-float-label label::after {\n    content: \" \";\n    display: block;\n    position: absolute;\n    height: 2px;\n    top: 50%;\n    left: -.2em;\n    right: -.2em;\n    z-index: -1;\n}\n.has-float-label .form-control::-webkit-input-placeholder {\n    opacity: 1;\n    -webkit-transition: all .2s;\n    transition: all .2s;\n}\n.has-float-label .form-control:placeholder-shown:not(:focus)::-webkit-input-placeholder {\n    opacity: 1;\n}\n.has-float-label .form-control:placeholder-shown:not(:focus)+label {\n    pointer-events: none;\n    font-size: 14px;\n    opacity: 0;\n    top: 1em;\n    font-weight: 400;\n}\n.input-group .has-float-label {\n    display: table-cell;\n}\n.input-group .has-float-label .form-control {\n    border-radius: 4px;\n}\n.input-group .has-float-label:not(:last-child) .form-control {\n    border-bottom-right-radius: 0;\n    border-top-right-radius: 0;\n}\n.input-group .has-float-label:not(:first-child) .form-control {\n    border-bottom-left-radius: 0;\n    border-top-left-radius: 0;\n    margin-left: -1px;\n}", ""]);
+	
+	// exports
+
+
+/***/ }),
+/* 11 */
+/***/ (function(module, exports) {
+
+	/*
+		MIT License http://www.opensource.org/licenses/mit-license.php
+		Author Tobias Koppers @sokra
+	*/
+	// css base code, injected by the css-loader
+	module.exports = function() {
+		var list = [];
+	
+		// return the list of modules as css string
+		list.toString = function toString() {
+			var result = [];
+			for(var i = 0; i < this.length; i++) {
+				var item = this[i];
+				if(item[2]) {
+					result.push("@media " + item[2] + "{" + item[1] + "}");
+				} else {
+					result.push(item[1]);
+				}
+			}
+			return result.join("");
+		};
+	
+		// import a list of modules into the list
+		list.i = function(modules, mediaQuery) {
+			if(typeof modules === "string")
+				modules = [[null, modules, ""]];
+			var alreadyImportedModules = {};
+			for(var i = 0; i < this.length; i++) {
+				var id = this[i][0];
+				if(typeof id === "number")
+					alreadyImportedModules[id] = true;
+			}
+			for(i = 0; i < modules.length; i++) {
+				var item = modules[i];
+				// skip already imported module
+				// this implementation is not 100% perfect for weird media query combinations
+				//  when a module is imported multiple times with different media queries.
+				//  I hope this will never occur (Hey this way we have smaller bundles)
+				if(typeof item[0] !== "number" || !alreadyImportedModules[item[0]]) {
+					if(mediaQuery && !item[2]) {
+						item[2] = mediaQuery;
+					} else if(mediaQuery) {
+						item[2] = "(" + item[2] + ") and (" + mediaQuery + ")";
+					}
+					list.push(item);
+				}
+			}
+		};
+		return list;
+	};
+
+
+/***/ }),
+/* 12 */
+/***/ (function(module, exports, __webpack_require__) {
+
+	/*
+		MIT License http://www.opensource.org/licenses/mit-license.php
+		Author Tobias Koppers @sokra
+	*/
+	var stylesInDom = {},
+		memoize = function(fn) {
+			var memo;
+			return function () {
+				if (typeof memo === "undefined") memo = fn.apply(this, arguments);
+				return memo;
+			};
+		},
+		isOldIE = memoize(function() {
+			return /msie [6-9]\b/.test(self.navigator.userAgent.toLowerCase());
+		}),
+		getHeadElement = memoize(function () {
+			return document.head || document.getElementsByTagName("head")[0];
+		}),
+		singletonElement = null,
+		singletonCounter = 0,
+		styleElementsInsertedAtTop = [];
+	
+	module.exports = function(list, options) {
+		if(false) {
+			if(typeof document !== "object") throw new Error("The style-loader cannot be used in a non-browser environment");
+		}
+	
+		options = options || {};
+		// Force single-tag solution on IE6-9, which has a hard limit on the # of <style>
+		// tags it will allow on a page
+		if (typeof options.singleton === "undefined") options.singleton = isOldIE();
+	
+		// By default, add <style> tags to the bottom of <head>.
+		if (typeof options.insertAt === "undefined") options.insertAt = "bottom";
+	
+		var styles = listToStyles(list);
+		addStylesToDom(styles, options);
+	
+		return function update(newList) {
+			var mayRemove = [];
+			for(var i = 0; i < styles.length; i++) {
+				var item = styles[i];
+				var domStyle = stylesInDom[item.id];
+				domStyle.refs--;
+				mayRemove.push(domStyle);
+			}
+			if(newList) {
+				var newStyles = listToStyles(newList);
+				addStylesToDom(newStyles, options);
+			}
+			for(var i = 0; i < mayRemove.length; i++) {
+				var domStyle = mayRemove[i];
+				if(domStyle.refs === 0) {
+					for(var j = 0; j < domStyle.parts.length; j++)
+						domStyle.parts[j]();
+					delete stylesInDom[domStyle.id];
+				}
+			}
+		};
+	}
+	
+	function addStylesToDom(styles, options) {
+		for(var i = 0; i < styles.length; i++) {
+			var item = styles[i];
+			var domStyle = stylesInDom[item.id];
+			if(domStyle) {
+				domStyle.refs++;
+				for(var j = 0; j < domStyle.parts.length; j++) {
+					domStyle.parts[j](item.parts[j]);
+				}
+				for(; j < item.parts.length; j++) {
+					domStyle.parts.push(addStyle(item.parts[j], options));
+				}
+			} else {
+				var parts = [];
+				for(var j = 0; j < item.parts.length; j++) {
+					parts.push(addStyle(item.parts[j], options));
+				}
+				stylesInDom[item.id] = {id: item.id, refs: 1, parts: parts};
+			}
+		}
+	}
+	
+	function listToStyles(list) {
+		var styles = [];
+		var newStyles = {};
+		for(var i = 0; i < list.length; i++) {
+			var item = list[i];
+			var id = item[0];
+			var css = item[1];
+			var media = item[2];
+			var sourceMap = item[3];
+			var part = {css: css, media: media, sourceMap: sourceMap};
+			if(!newStyles[id])
+				styles.push(newStyles[id] = {id: id, parts: [part]});
+			else
+				newStyles[id].parts.push(part);
+		}
+		return styles;
+	}
+	
+	function insertStyleElement(options, styleElement) {
+		var head = getHeadElement();
+		var lastStyleElementInsertedAtTop = styleElementsInsertedAtTop[styleElementsInsertedAtTop.length - 1];
+		if (options.insertAt === "top") {
+			if(!lastStyleElementInsertedAtTop) {
+				head.insertBefore(styleElement, head.firstChild);
+			} else if(lastStyleElementInsertedAtTop.nextSibling) {
+				head.insertBefore(styleElement, lastStyleElementInsertedAtTop.nextSibling);
+			} else {
+				head.appendChild(styleElement);
+			}
+			styleElementsInsertedAtTop.push(styleElement);
+		} else if (options.insertAt === "bottom") {
+			head.appendChild(styleElement);
+		} else {
+			throw new Error("Invalid value for parameter 'insertAt'. Must be 'top' or 'bottom'.");
+		}
+	}
+	
+	function removeStyleElement(styleElement) {
+		styleElement.parentNode.removeChild(styleElement);
+		var idx = styleElementsInsertedAtTop.indexOf(styleElement);
+		if(idx >= 0) {
+			styleElementsInsertedAtTop.splice(idx, 1);
+		}
+	}
+	
+	function createStyleElement(options) {
+		var styleElement = document.createElement("style");
+		styleElement.type = "text/css";
+		insertStyleElement(options, styleElement);
+		return styleElement;
+	}
+	
+	function createLinkElement(options) {
+		var linkElement = document.createElement("link");
+		linkElement.rel = "stylesheet";
+		insertStyleElement(options, linkElement);
+		return linkElement;
+	}
+	
+	function addStyle(obj, options) {
+		var styleElement, update, remove;
+	
+		if (options.singleton) {
+			var styleIndex = singletonCounter++;
+			styleElement = singletonElement || (singletonElement = createStyleElement(options));
+			update = applyToSingletonTag.bind(null, styleElement, styleIndex, false);
+			remove = applyToSingletonTag.bind(null, styleElement, styleIndex, true);
+		} else if(obj.sourceMap &&
+			typeof URL === "function" &&
+			typeof URL.createObjectURL === "function" &&
+			typeof URL.revokeObjectURL === "function" &&
+			typeof Blob === "function" &&
+			typeof btoa === "function") {
+			styleElement = createLinkElement(options);
+			update = updateLink.bind(null, styleElement);
+			remove = function() {
+				removeStyleElement(styleElement);
+				if(styleElement.href)
+					URL.revokeObjectURL(styleElement.href);
+			};
+		} else {
+			styleElement = createStyleElement(options);
+			update = applyToTag.bind(null, styleElement);
+			remove = function() {
+				removeStyleElement(styleElement);
+			};
+		}
+	
+		update(obj);
+	
+		return function updateStyle(newObj) {
+			if(newObj) {
+				if(newObj.css === obj.css && newObj.media === obj.media && newObj.sourceMap === obj.sourceMap)
+					return;
+				update(obj = newObj);
+			} else {
+				remove();
+			}
+		};
+	}
+	
+	var replaceText = (function () {
+		var textStore = [];
+	
+		return function (index, replacement) {
+			textStore[index] = replacement;
+			return textStore.filter(Boolean).join('\n');
+		};
+	})();
+	
+	function applyToSingletonTag(styleElement, index, remove, obj) {
+		var css = remove ? "" : obj.css;
+	
+		if (styleElement.styleSheet) {
+			styleElement.styleSheet.cssText = replaceText(index, css);
+		} else {
+			var cssNode = document.createTextNode(css);
+			var childNodes = styleElement.childNodes;
+			if (childNodes[index]) styleElement.removeChild(childNodes[index]);
+			if (childNodes.length) {
+				styleElement.insertBefore(cssNode, childNodes[index]);
+			} else {
+				styleElement.appendChild(cssNode);
+			}
+		}
+	}
+	
+	function applyToTag(styleElement, obj) {
+		var css = obj.css;
+		var media = obj.media;
+	
+		if(media) {
+			styleElement.setAttribute("media", media)
+		}
+	
+		if(styleElement.styleSheet) {
+			styleElement.styleSheet.cssText = css;
+		} else {
+			while(styleElement.firstChild) {
+				styleElement.removeChild(styleElement.firstChild);
+			}
+			styleElement.appendChild(document.createTextNode(css));
+		}
+	}
+	
+	function updateLink(linkElement, obj) {
+		var css = obj.css;
+		var sourceMap = obj.sourceMap;
+	
+		if(sourceMap) {
+			// http://stackoverflow.com/a/26603875
+			css += "\n/*# sourceMappingURL=data:application/json;base64," + btoa(unescape(encodeURIComponent(JSON.stringify(sourceMap)))) + " */";
+		}
+	
+		var blob = new Blob([css], { type: "text/css" });
+	
+		var oldSrc = linkElement.href;
+	
+		linkElement.href = URL.createObjectURL(blob);
+	
+		if(oldSrc)
+			URL.revokeObjectURL(oldSrc);
+	}
+
+
+/***/ }),
+/* 13 */
 /***/ (function(module, exports, __webpack_require__) {
 
 	/* @preserve
@@ -21165,7 +21587,7 @@
 
 
 /***/ }),
-/* 10 */
+/* 14 */
 /***/ (function(module, exports, __webpack_require__) {
 
 	var __WEBPACK_AMD_DEFINE_FACTORY__, __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_DEFINE_RESULT__;/*
@@ -21180,7 +21602,7 @@
 		var L;
 		if (true) {
 			// AMD
-			!(__WEBPACK_AMD_DEFINE_ARRAY__ = [__webpack_require__(9)], __WEBPACK_AMD_DEFINE_FACTORY__ = (factory), __WEBPACK_AMD_DEFINE_RESULT__ = (typeof __WEBPACK_AMD_DEFINE_FACTORY__ === 'function' ? (__WEBPACK_AMD_DEFINE_FACTORY__.apply(exports, __WEBPACK_AMD_DEFINE_ARRAY__)) : __WEBPACK_AMD_DEFINE_FACTORY__), __WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
+			!(__WEBPACK_AMD_DEFINE_ARRAY__ = [__webpack_require__(13)], __WEBPACK_AMD_DEFINE_FACTORY__ = (factory), __WEBPACK_AMD_DEFINE_RESULT__ = (typeof __WEBPACK_AMD_DEFINE_FACTORY__ === 'function' ? (__WEBPACK_AMD_DEFINE_FACTORY__.apply(exports, __WEBPACK_AMD_DEFINE_ARRAY__)) : __WEBPACK_AMD_DEFINE_FACTORY__), __WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
 		} else if (typeof module === 'object' && typeof module.exports === 'object') {
 			// Node/CommonJS
 			L = require('leaflet');
@@ -21757,7 +22179,7 @@
 
 
 /***/ }),
-/* 11 */
+/* 15 */
 /***/ (function(module, exports) {
 
 	/*
@@ -21963,16 +22385,16 @@
 	};
 
 /***/ }),
-/* 12 */
+/* 16 */
 /***/ (function(module, exports, __webpack_require__) {
 
 	// style-loader: Adds some css to the DOM by adding a <style> tag
 	
 	// load the styles
-	var content = __webpack_require__(13);
+	var content = __webpack_require__(17);
 	if(typeof content === 'string') content = [[module.id, content, '']];
 	// add the styles to the DOM
-	var update = __webpack_require__(17)(content, {});
+	var update = __webpack_require__(12)(content, {});
 	if(content.locals) module.exports = content.locals;
 	// Hot Module Replacement
 	if(false) {
@@ -21989,341 +22411,33 @@
 	}
 
 /***/ }),
-/* 13 */
+/* 17 */
 /***/ (function(module, exports, __webpack_require__) {
 
-	exports = module.exports = __webpack_require__(14)();
+	exports = module.exports = __webpack_require__(11)();
 	// imports
 	
 	
 	// module
-	exports.push([module.id, ".leaflet-control-geocoder {\n\tborder-radius: 4px;\n\tbackground: white;\n\tmin-width: 26px;\n\tmin-height: 26px;\n}\n\n.leaflet-touch .leaflet-control-geocoder {\n\tmin-width: 30px;\n\tmin-height: 30px;\n}\n\n.leaflet-control-geocoder a, .leaflet-control-geocoder .leaflet-control-geocoder-icon {\n\tborder-bottom: none;\n\tdisplay: inline-block;\n}\n\n.leaflet-control-geocoder .leaflet-control-geocoder-alternatives a {\n\twidth: inherit;\n\theight: inherit;\n\tline-height: inherit;\n}\n\n.leaflet-control-geocoder a:hover, .leaflet-control-geocoder .leaflet-control-geocoder-icon:hover {\n\tborder-bottom: none;\n\tdisplay: inline-block;\n}\n\n.leaflet-control-geocoder-form {\n\tdisplay: none;\n\tvertical-align: middle;\n}\n.leaflet-control-geocoder-expanded .leaflet-control-geocoder-form {\n\tdisplay: inline-block;\n}\n.leaflet-control-geocoder-form input {\n\tfont-size: 120%;\n\tborder: 0;\n\tbackground-color: transparent;\n\twidth: 246px;\n}\n\n.leaflet-control-geocoder-icon {\n\tborder-radius: 4px;\n\twidth: 26px;\n\theight: 26px;\n\tborder: none;\n\tbackground-color: white;\n\tbackground-image: url(" + __webpack_require__(15) + ");\n\tbackground-repeat: no-repeat;\n\tbackground-position: center;\n\tcursor: pointer;\n}\n\n.leaflet-touch .leaflet-control-geocoder-icon {\n\twidth: 30px;\n\theight: 30px;\n}\n\n.leaflet-control-geocoder-throbber .leaflet-control-geocoder-icon {\n\tbackground-image: url(" + __webpack_require__(16) + ");\n}\n\n.leaflet-control-geocoder-form-no-error {\n\tdisplay: none;\n}\n\n.leaflet-control-geocoder-form input:focus {\n\toutline: none;\n}\n\n.leaflet-control-geocoder-form button {\n\tdisplay: none;\n}\n.leaflet-control-geocoder-error {\n\tmargin-top: 8px;\n\tmargin-left: 8px;\n\tdisplay: block;\n\tcolor: #444;\n}\n.leaflet-control-geocoder-alternatives {\n\tdisplay: block;\n\twidth: 272px;\n\tlist-style: none;\n\tpadding: 0;\n\tmargin: 0;\n}\n\n.leaflet-control-geocoder-alternatives-minimized {\n\tdisplay: none;\n\theight: 0;\n}\n.leaflet-control-geocoder-alternatives li {\n\twhite-space: nowrap;\n\tdisplay: block;\n\toverflow: hidden;\n\tpadding: 5px 8px;\n\ttext-overflow: ellipsis;\n\tborder-bottom: 1px solid #ccc;\n\tcursor: pointer;\n}\n\n.leaflet-control-geocoder-alternatives li a, .leaflet-control-geocoder-alternatives li a:hover {\n\twidth: inherit;\n\theight: inherit;\n\tline-height: inherit;\n\tbackground: inherit;\n\tborder-radius: inherit;\n\ttext-align: left;\n}\n\n.leaflet-control-geocoder-alternatives li:last-child {\n\tborder-bottom: none;\n}\n.leaflet-control-geocoder-alternatives li:hover, .leaflet-control-geocoder-selected {\n\tbackground-color: #f5f5f5;\n}\n.leaflet-control-geocoder-address-detail {\n\t\n}\n.leaflet-control-geocoder-address-context {\n\tcolor: #666;\n}", ""]);
+	exports.push([module.id, ".leaflet-control-geocoder {\n\tborder-radius: 4px;\n\tbackground: white;\n\tmin-width: 26px;\n\tmin-height: 26px;\n}\n\n.leaflet-touch .leaflet-control-geocoder {\n\tmin-width: 30px;\n\tmin-height: 30px;\n}\n\n.leaflet-control-geocoder a, .leaflet-control-geocoder .leaflet-control-geocoder-icon {\n\tborder-bottom: none;\n\tdisplay: inline-block;\n}\n\n.leaflet-control-geocoder .leaflet-control-geocoder-alternatives a {\n\twidth: inherit;\n\theight: inherit;\n\tline-height: inherit;\n}\n\n.leaflet-control-geocoder a:hover, .leaflet-control-geocoder .leaflet-control-geocoder-icon:hover {\n\tborder-bottom: none;\n\tdisplay: inline-block;\n}\n\n.leaflet-control-geocoder-form {\n\tdisplay: none;\n\tvertical-align: middle;\n}\n.leaflet-control-geocoder-expanded .leaflet-control-geocoder-form {\n\tdisplay: inline-block;\n}\n.leaflet-control-geocoder-form input {\n\tfont-size: 120%;\n\tborder: 0;\n\tbackground-color: transparent;\n\twidth: 246px;\n}\n\n.leaflet-control-geocoder-icon {\n\tborder-radius: 4px;\n\twidth: 26px;\n\theight: 26px;\n\tborder: none;\n\tbackground-color: white;\n\tbackground-image: url(" + __webpack_require__(18) + ");\n\tbackground-repeat: no-repeat;\n\tbackground-position: center;\n\tcursor: pointer;\n}\n\n.leaflet-touch .leaflet-control-geocoder-icon {\n\twidth: 30px;\n\theight: 30px;\n}\n\n.leaflet-control-geocoder-throbber .leaflet-control-geocoder-icon {\n\tbackground-image: url(" + __webpack_require__(19) + ");\n}\n\n.leaflet-control-geocoder-form-no-error {\n\tdisplay: none;\n}\n\n.leaflet-control-geocoder-form input:focus {\n\toutline: none;\n}\n\n.leaflet-control-geocoder-form button {\n\tdisplay: none;\n}\n.leaflet-control-geocoder-error {\n\tmargin-top: 8px;\n\tmargin-left: 8px;\n\tdisplay: block;\n\tcolor: #444;\n}\n.leaflet-control-geocoder-alternatives {\n\tdisplay: block;\n\twidth: 272px;\n\tlist-style: none;\n\tpadding: 0;\n\tmargin: 0;\n}\n\n.leaflet-control-geocoder-alternatives-minimized {\n\tdisplay: none;\n\theight: 0;\n}\n.leaflet-control-geocoder-alternatives li {\n\twhite-space: nowrap;\n\tdisplay: block;\n\toverflow: hidden;\n\tpadding: 5px 8px;\n\ttext-overflow: ellipsis;\n\tborder-bottom: 1px solid #ccc;\n\tcursor: pointer;\n}\n\n.leaflet-control-geocoder-alternatives li a, .leaflet-control-geocoder-alternatives li a:hover {\n\twidth: inherit;\n\theight: inherit;\n\tline-height: inherit;\n\tbackground: inherit;\n\tborder-radius: inherit;\n\ttext-align: left;\n}\n\n.leaflet-control-geocoder-alternatives li:last-child {\n\tborder-bottom: none;\n}\n.leaflet-control-geocoder-alternatives li:hover, .leaflet-control-geocoder-selected {\n\tbackground-color: #f5f5f5;\n}\n.leaflet-control-geocoder-address-detail {\n\t\n}\n.leaflet-control-geocoder-address-context {\n\tcolor: #666;\n}", ""]);
 	
 	// exports
 
 
 /***/ }),
-/* 14 */
-/***/ (function(module, exports) {
-
-	/*
-		MIT License http://www.opensource.org/licenses/mit-license.php
-		Author Tobias Koppers @sokra
-	*/
-	// css base code, injected by the css-loader
-	module.exports = function() {
-		var list = [];
-	
-		// return the list of modules as css string
-		list.toString = function toString() {
-			var result = [];
-			for(var i = 0; i < this.length; i++) {
-				var item = this[i];
-				if(item[2]) {
-					result.push("@media " + item[2] + "{" + item[1] + "}");
-				} else {
-					result.push(item[1]);
-				}
-			}
-			return result.join("");
-		};
-	
-		// import a list of modules into the list
-		list.i = function(modules, mediaQuery) {
-			if(typeof modules === "string")
-				modules = [[null, modules, ""]];
-			var alreadyImportedModules = {};
-			for(var i = 0; i < this.length; i++) {
-				var id = this[i][0];
-				if(typeof id === "number")
-					alreadyImportedModules[id] = true;
-			}
-			for(i = 0; i < modules.length; i++) {
-				var item = modules[i];
-				// skip already imported module
-				// this implementation is not 100% perfect for weird media query combinations
-				//  when a module is imported multiple times with different media queries.
-				//  I hope this will never occur (Hey this way we have smaller bundles)
-				if(typeof item[0] !== "number" || !alreadyImportedModules[item[0]]) {
-					if(mediaQuery && !item[2]) {
-						item[2] = mediaQuery;
-					} else if(mediaQuery) {
-						item[2] = "(" + item[2] + ") and (" + mediaQuery + ")";
-					}
-					list.push(item);
-				}
-			}
-		};
-		return list;
-	};
-
-
-/***/ }),
-/* 15 */
+/* 18 */
 /***/ (function(module, exports, __webpack_require__) {
 
 	module.exports = __webpack_require__.p + "a987f06fc5d9aaa4e9dfa3df0b37ee22.png";
 
 /***/ }),
-/* 16 */
+/* 19 */
 /***/ (function(module, exports, __webpack_require__) {
 
 	module.exports = __webpack_require__.p + "7bec7f6885833b0b60a0426f027d8f16.gif";
 
 /***/ }),
-/* 17 */
-/***/ (function(module, exports, __webpack_require__) {
-
-	/*
-		MIT License http://www.opensource.org/licenses/mit-license.php
-		Author Tobias Koppers @sokra
-	*/
-	var stylesInDom = {},
-		memoize = function(fn) {
-			var memo;
-			return function () {
-				if (typeof memo === "undefined") memo = fn.apply(this, arguments);
-				return memo;
-			};
-		},
-		isOldIE = memoize(function() {
-			return /msie [6-9]\b/.test(self.navigator.userAgent.toLowerCase());
-		}),
-		getHeadElement = memoize(function () {
-			return document.head || document.getElementsByTagName("head")[0];
-		}),
-		singletonElement = null,
-		singletonCounter = 0,
-		styleElementsInsertedAtTop = [];
-	
-	module.exports = function(list, options) {
-		if(false) {
-			if(typeof document !== "object") throw new Error("The style-loader cannot be used in a non-browser environment");
-		}
-	
-		options = options || {};
-		// Force single-tag solution on IE6-9, which has a hard limit on the # of <style>
-		// tags it will allow on a page
-		if (typeof options.singleton === "undefined") options.singleton = isOldIE();
-	
-		// By default, add <style> tags to the bottom of <head>.
-		if (typeof options.insertAt === "undefined") options.insertAt = "bottom";
-	
-		var styles = listToStyles(list);
-		addStylesToDom(styles, options);
-	
-		return function update(newList) {
-			var mayRemove = [];
-			for(var i = 0; i < styles.length; i++) {
-				var item = styles[i];
-				var domStyle = stylesInDom[item.id];
-				domStyle.refs--;
-				mayRemove.push(domStyle);
-			}
-			if(newList) {
-				var newStyles = listToStyles(newList);
-				addStylesToDom(newStyles, options);
-			}
-			for(var i = 0; i < mayRemove.length; i++) {
-				var domStyle = mayRemove[i];
-				if(domStyle.refs === 0) {
-					for(var j = 0; j < domStyle.parts.length; j++)
-						domStyle.parts[j]();
-					delete stylesInDom[domStyle.id];
-				}
-			}
-		};
-	}
-	
-	function addStylesToDom(styles, options) {
-		for(var i = 0; i < styles.length; i++) {
-			var item = styles[i];
-			var domStyle = stylesInDom[item.id];
-			if(domStyle) {
-				domStyle.refs++;
-				for(var j = 0; j < domStyle.parts.length; j++) {
-					domStyle.parts[j](item.parts[j]);
-				}
-				for(; j < item.parts.length; j++) {
-					domStyle.parts.push(addStyle(item.parts[j], options));
-				}
-			} else {
-				var parts = [];
-				for(var j = 0; j < item.parts.length; j++) {
-					parts.push(addStyle(item.parts[j], options));
-				}
-				stylesInDom[item.id] = {id: item.id, refs: 1, parts: parts};
-			}
-		}
-	}
-	
-	function listToStyles(list) {
-		var styles = [];
-		var newStyles = {};
-		for(var i = 0; i < list.length; i++) {
-			var item = list[i];
-			var id = item[0];
-			var css = item[1];
-			var media = item[2];
-			var sourceMap = item[3];
-			var part = {css: css, media: media, sourceMap: sourceMap};
-			if(!newStyles[id])
-				styles.push(newStyles[id] = {id: id, parts: [part]});
-			else
-				newStyles[id].parts.push(part);
-		}
-		return styles;
-	}
-	
-	function insertStyleElement(options, styleElement) {
-		var head = getHeadElement();
-		var lastStyleElementInsertedAtTop = styleElementsInsertedAtTop[styleElementsInsertedAtTop.length - 1];
-		if (options.insertAt === "top") {
-			if(!lastStyleElementInsertedAtTop) {
-				head.insertBefore(styleElement, head.firstChild);
-			} else if(lastStyleElementInsertedAtTop.nextSibling) {
-				head.insertBefore(styleElement, lastStyleElementInsertedAtTop.nextSibling);
-			} else {
-				head.appendChild(styleElement);
-			}
-			styleElementsInsertedAtTop.push(styleElement);
-		} else if (options.insertAt === "bottom") {
-			head.appendChild(styleElement);
-		} else {
-			throw new Error("Invalid value for parameter 'insertAt'. Must be 'top' or 'bottom'.");
-		}
-	}
-	
-	function removeStyleElement(styleElement) {
-		styleElement.parentNode.removeChild(styleElement);
-		var idx = styleElementsInsertedAtTop.indexOf(styleElement);
-		if(idx >= 0) {
-			styleElementsInsertedAtTop.splice(idx, 1);
-		}
-	}
-	
-	function createStyleElement(options) {
-		var styleElement = document.createElement("style");
-		styleElement.type = "text/css";
-		insertStyleElement(options, styleElement);
-		return styleElement;
-	}
-	
-	function createLinkElement(options) {
-		var linkElement = document.createElement("link");
-		linkElement.rel = "stylesheet";
-		insertStyleElement(options, linkElement);
-		return linkElement;
-	}
-	
-	function addStyle(obj, options) {
-		var styleElement, update, remove;
-	
-		if (options.singleton) {
-			var styleIndex = singletonCounter++;
-			styleElement = singletonElement || (singletonElement = createStyleElement(options));
-			update = applyToSingletonTag.bind(null, styleElement, styleIndex, false);
-			remove = applyToSingletonTag.bind(null, styleElement, styleIndex, true);
-		} else if(obj.sourceMap &&
-			typeof URL === "function" &&
-			typeof URL.createObjectURL === "function" &&
-			typeof URL.revokeObjectURL === "function" &&
-			typeof Blob === "function" &&
-			typeof btoa === "function") {
-			styleElement = createLinkElement(options);
-			update = updateLink.bind(null, styleElement);
-			remove = function() {
-				removeStyleElement(styleElement);
-				if(styleElement.href)
-					URL.revokeObjectURL(styleElement.href);
-			};
-		} else {
-			styleElement = createStyleElement(options);
-			update = applyToTag.bind(null, styleElement);
-			remove = function() {
-				removeStyleElement(styleElement);
-			};
-		}
-	
-		update(obj);
-	
-		return function updateStyle(newObj) {
-			if(newObj) {
-				if(newObj.css === obj.css && newObj.media === obj.media && newObj.sourceMap === obj.sourceMap)
-					return;
-				update(obj = newObj);
-			} else {
-				remove();
-			}
-		};
-	}
-	
-	var replaceText = (function () {
-		var textStore = [];
-	
-		return function (index, replacement) {
-			textStore[index] = replacement;
-			return textStore.filter(Boolean).join('\n');
-		};
-	})();
-	
-	function applyToSingletonTag(styleElement, index, remove, obj) {
-		var css = remove ? "" : obj.css;
-	
-		if (styleElement.styleSheet) {
-			styleElement.styleSheet.cssText = replaceText(index, css);
-		} else {
-			var cssNode = document.createTextNode(css);
-			var childNodes = styleElement.childNodes;
-			if (childNodes[index]) styleElement.removeChild(childNodes[index]);
-			if (childNodes.length) {
-				styleElement.insertBefore(cssNode, childNodes[index]);
-			} else {
-				styleElement.appendChild(cssNode);
-			}
-		}
-	}
-	
-	function applyToTag(styleElement, obj) {
-		var css = obj.css;
-		var media = obj.media;
-	
-		if(media) {
-			styleElement.setAttribute("media", media)
-		}
-	
-		if(styleElement.styleSheet) {
-			styleElement.styleSheet.cssText = css;
-		} else {
-			while(styleElement.firstChild) {
-				styleElement.removeChild(styleElement.firstChild);
-			}
-			styleElement.appendChild(document.createTextNode(css));
-		}
-	}
-	
-	function updateLink(linkElement, obj) {
-		var css = obj.css;
-		var sourceMap = obj.sourceMap;
-	
-		if(sourceMap) {
-			// http://stackoverflow.com/a/26603875
-			css += "\n/*# sourceMappingURL=data:application/json;base64," + btoa(unescape(encodeURIComponent(JSON.stringify(sourceMap)))) + " */";
-		}
-	
-		var blob = new Blob([css], { type: "text/css" });
-	
-		var oldSrc = linkElement.href;
-	
-		linkElement.href = URL.createObjectURL(blob);
-	
-		if(oldSrc)
-			URL.revokeObjectURL(oldSrc);
-	}
-
-
-/***/ }),
-/* 18 */
+/* 20 */
 /***/ (function(module, exports) {
 
 	(function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.leafletControlGeocoder = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(_dereq_,module,exports){
@@ -23624,7 +23738,7 @@
 	});
 
 /***/ }),
-/* 19 */
+/* 21 */
 /***/ (function(module, exports) {
 
 	/*
@@ -23639,16 +23753,16 @@
 	this._selectedPathOptions&&(e instanceof L.Marker?this._toggleMarkerHighlight(e):(e.setStyle(e.options.previousOptions),delete e.options.previousOptions)),e instanceof L.Marker?(e.dragging.disable(),e.off("dragend",this._onMarkerDragEnd,this).off("touchmove",this._onTouchMove,this).off("MSPointerMove",this._onTouchMove,this).off("touchend",this._onMarkerDragEnd,this).off("MSPointerUp",this._onMarkerDragEnd,this)):e.editing.disable()},_onMouseMove:function(t){this._tooltip.updatePosition(t.latlng)},_onMarkerDragEnd:function(t){var e=t.target;e.edited=!0,this._map.fire(L.Draw.Event.EDITMOVE,{layer:e})},_onTouchMove:function(t){var e=t.originalEvent.changedTouches[0],i=this._map.mouseEventToLayerPoint(e),o=this._map.layerPointToLatLng(i);t.target.setLatLng(o)},_hasAvailableLayers:function(){return 0!==this._featureGroup.getLayers().length}}),L.EditToolbar.Delete=L.Handler.extend({statics:{TYPE:"remove"},initialize:function(t,e){if(L.Handler.prototype.initialize.call(this,t),L.Util.setOptions(this,e),this._deletableLayers=this.options.featureGroup,!(this._deletableLayers instanceof L.FeatureGroup))throw new Error("options.featureGroup must be a L.FeatureGroup");this.type=L.EditToolbar.Delete.TYPE;var i=L.version.split(".");1===parseInt(i[0],10)&&parseInt(i[1],10)>=2?L.EditToolbar.Delete.include(L.Evented.prototype):L.EditToolbar.Delete.include(L.Mixin.Events)},enable:function(){!this._enabled&&this._hasAvailableLayers()&&(this.fire("enabled",{handler:this.type}),this._map.fire(L.Draw.Event.DELETESTART,{handler:this.type}),L.Handler.prototype.enable.call(this),this._deletableLayers.on("layeradd",this._enableLayerDelete,this).on("layerremove",this._disableLayerDelete,this))},disable:function(){this._enabled&&(this._deletableLayers.off("layeradd",this._enableLayerDelete,this).off("layerremove",this._disableLayerDelete,this),L.Handler.prototype.disable.call(this),this._map.fire(L.Draw.Event.DELETESTOP,{handler:this.type}),this.fire("disabled",{handler:this.type}))},addHooks:function(){var t=this._map;t&&(t.getContainer().focus(),this._deletableLayers.eachLayer(this._enableLayerDelete,this),this._deletedLayers=new L.LayerGroup,this._tooltip=new L.Draw.Tooltip(this._map),this._tooltip.updateContent({text:L.drawLocal.edit.handlers.remove.tooltip.text}),this._map.on("mousemove",this._onMouseMove,this))},removeHooks:function(){this._map&&(this._deletableLayers.eachLayer(this._disableLayerDelete,this),this._deletedLayers=null,this._tooltip.dispose(),this._tooltip=null,this._map.off("mousemove",this._onMouseMove,this))},revertLayers:function(){this._deletedLayers.eachLayer(function(t){this._deletableLayers.addLayer(t),t.fire("revert-deleted",{layer:t})},this)},save:function(){this._map.fire(L.Draw.Event.DELETED,{layers:this._deletedLayers})},removeAllLayers:function(){this._deletableLayers.eachLayer(function(t){this._removeLayer({layer:t})},this),this.save()},_enableLayerDelete:function(t){(t.layer||t.target||t).on("click",this._removeLayer,this)},_disableLayerDelete:function(t){var e=t.layer||t.target||t;e.off("click",this._removeLayer,this),this._deletedLayers.removeLayer(e)},_removeLayer:function(t){var e=t.layer||t.target||t;this._deletableLayers.removeLayer(e),this._deletedLayers.addLayer(e),e.fire("deleted")},_onMouseMove:function(t){this._tooltip.updatePosition(t.latlng)},_hasAvailableLayers:function(){return 0!==this._deletableLayers.getLayers().length}})}(window,document);
 
 /***/ }),
-/* 20 */
+/* 22 */
 /***/ (function(module, exports, __webpack_require__) {
 
 	// style-loader: Adds some css to the DOM by adding a <style> tag
 	
 	// load the styles
-	var content = __webpack_require__(21);
+	var content = __webpack_require__(23);
 	if(typeof content === 'string') content = [[module.id, content, '']];
 	// add the styles to the DOM
-	var update = __webpack_require__(17)(content, {});
+	var update = __webpack_require__(12)(content, {});
 	if(content.locals) module.exports = content.locals;
 	// Hot Module Replacement
 	if(false) {
@@ -23665,48 +23779,48 @@
 	}
 
 /***/ }),
-/* 21 */
+/* 23 */
 /***/ (function(module, exports, __webpack_require__) {
 
-	exports = module.exports = __webpack_require__(14)();
+	exports = module.exports = __webpack_require__(11)();
 	// imports
 	
 	
 	// module
-	exports.push([module.id, ".leaflet-draw-section{position:relative}.leaflet-draw-toolbar{margin-top:12px}.leaflet-draw-toolbar-top{margin-top:0}.leaflet-draw-toolbar-notop a:first-child{border-top-right-radius:0}.leaflet-draw-toolbar-nobottom a:last-child{border-bottom-right-radius:0}.leaflet-draw-toolbar a{background-image:url(" + __webpack_require__(22) + ");background-image:linear-gradient(transparent,transparent),url(" + __webpack_require__(23) + ");background-repeat:no-repeat;background-size:300px 30px;background-clip:padding-box}.leaflet-retina .leaflet-draw-toolbar a{background-image:url(" + __webpack_require__(24) + ");background-image:linear-gradient(transparent,transparent),url(" + __webpack_require__(23) + ")}\n.leaflet-draw a{display:block;text-align:center;text-decoration:none}.leaflet-draw a .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0}.leaflet-draw-actions{display:none;list-style:none;margin:0;padding:0;position:absolute;left:26px;top:0;white-space:nowrap}.leaflet-touch .leaflet-draw-actions{left:32px}.leaflet-right .leaflet-draw-actions{right:26px;left:auto}.leaflet-touch .leaflet-right .leaflet-draw-actions{right:32px;left:auto}.leaflet-draw-actions li{display:inline-block}\n.leaflet-draw-actions li:first-child a{border-left:0}.leaflet-draw-actions li:last-child a{-webkit-border-radius:0 4px 4px 0;border-radius:0 4px 4px 0}.leaflet-right .leaflet-draw-actions li:last-child a{-webkit-border-radius:0;border-radius:0}.leaflet-right .leaflet-draw-actions li:first-child a{-webkit-border-radius:4px 0 0 4px;border-radius:4px 0 0 4px}.leaflet-draw-actions a{background-color:#919187;border-left:1px solid #AAA;color:#FFF;font:11px/19px \"Helvetica Neue\",Arial,Helvetica,sans-serif;line-height:28px;text-decoration:none;padding-left:10px;padding-right:10px;height:28px}\n.leaflet-touch .leaflet-draw-actions a{font-size:12px;line-height:30px;height:30px}.leaflet-draw-actions-bottom{margin-top:0}.leaflet-draw-actions-top{margin-top:1px}.leaflet-draw-actions-top a,.leaflet-draw-actions-bottom a{height:27px;line-height:27px}.leaflet-draw-actions a:hover{background-color:#a0a098}.leaflet-draw-actions-top.leaflet-draw-actions-bottom a{height:26px;line-height:26px}.leaflet-draw-toolbar .leaflet-draw-draw-polyline{background-position:-2px -2px}.leaflet-touch .leaflet-draw-toolbar .leaflet-draw-draw-polyline{background-position:0 -1px}\n.leaflet-draw-toolbar .leaflet-draw-draw-polygon{background-position:-31px -2px}.leaflet-touch .leaflet-draw-toolbar .leaflet-draw-draw-polygon{background-position:-29px -1px}.leaflet-draw-toolbar .leaflet-draw-draw-rectangle{background-position:-62px -2px}.leaflet-touch .leaflet-draw-toolbar .leaflet-draw-draw-rectangle{background-position:-60px -1px}.leaflet-draw-toolbar .leaflet-draw-draw-circle{background-position:-92px -2px}.leaflet-touch .leaflet-draw-toolbar .leaflet-draw-draw-circle{background-position:-90px -1px}\n.leaflet-draw-toolbar .leaflet-draw-draw-marker{background-position:-122px -2px}.leaflet-touch .leaflet-draw-toolbar .leaflet-draw-draw-marker{background-position:-120px -1px}.leaflet-draw-toolbar .leaflet-draw-draw-circlemarker{background-position:-273px -2px}.leaflet-touch .leaflet-draw-toolbar .leaflet-draw-draw-circlemarker{background-position:-271px -1px}.leaflet-draw-toolbar .leaflet-draw-edit-edit{background-position:-152px -2px}.leaflet-touch .leaflet-draw-toolbar .leaflet-draw-edit-edit{background-position:-150px -1px}\n.leaflet-draw-toolbar .leaflet-draw-edit-remove{background-position:-182px -2px}.leaflet-touch .leaflet-draw-toolbar .leaflet-draw-edit-remove{background-position:-180px -1px}.leaflet-draw-toolbar .leaflet-draw-edit-edit.leaflet-disabled{background-position:-212px -2px}.leaflet-touch .leaflet-draw-toolbar .leaflet-draw-edit-edit.leaflet-disabled{background-position:-210px -1px}.leaflet-draw-toolbar .leaflet-draw-edit-remove.leaflet-disabled{background-position:-242px -2px}.leaflet-touch .leaflet-draw-toolbar .leaflet-draw-edit-remove.leaflet-disabled{background-position:-240px -2px}\n.leaflet-mouse-marker{background-color:#fff;cursor:crosshair}.leaflet-draw-tooltip{background:#363636;background:rgba(0,0,0,0.5);border:1px solid transparent;-webkit-border-radius:4px;border-radius:4px;color:#fff;font:12px/18px \"Helvetica Neue\",Arial,Helvetica,sans-serif;margin-left:20px;margin-top:-21px;padding:4px 8px;position:absolute;visibility:hidden;white-space:nowrap;z-index:6}.leaflet-draw-tooltip:before{border-right:6px solid black;border-right-color:rgba(0,0,0,0.5);border-top:6px solid transparent;border-bottom:6px solid transparent;content:\"\";position:absolute;top:7px;left:-7px}\n.leaflet-error-draw-tooltip{background-color:#f2dede;border:1px solid #e6b6bd;color:#b94a48}.leaflet-error-draw-tooltip:before{border-right-color:#e6b6bd}.leaflet-draw-tooltip-single{margin-top:-12px}.leaflet-draw-tooltip-subtext{color:#f8d5e4}.leaflet-draw-guide-dash{font-size:1%;opacity:.6;position:absolute;width:5px;height:5px}.leaflet-edit-marker-selected{background-color:rgba(254,87,161,0.1);border:4px dashed rgba(254,87,161,0.6);-webkit-border-radius:4px;border-radius:4px;box-sizing:content-box}\n.leaflet-edit-move{cursor:move}.leaflet-edit-resize{cursor:pointer}.leaflet-oldie .leaflet-draw-toolbar{border:1px solid #999}", ""]);
+	exports.push([module.id, ".leaflet-draw-section{position:relative}.leaflet-draw-toolbar{margin-top:12px}.leaflet-draw-toolbar-top{margin-top:0}.leaflet-draw-toolbar-notop a:first-child{border-top-right-radius:0}.leaflet-draw-toolbar-nobottom a:last-child{border-bottom-right-radius:0}.leaflet-draw-toolbar a{background-image:url(" + __webpack_require__(24) + ");background-image:linear-gradient(transparent,transparent),url(" + __webpack_require__(25) + ");background-repeat:no-repeat;background-size:300px 30px;background-clip:padding-box}.leaflet-retina .leaflet-draw-toolbar a{background-image:url(" + __webpack_require__(26) + ");background-image:linear-gradient(transparent,transparent),url(" + __webpack_require__(25) + ")}\n.leaflet-draw a{display:block;text-align:center;text-decoration:none}.leaflet-draw a .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0}.leaflet-draw-actions{display:none;list-style:none;margin:0;padding:0;position:absolute;left:26px;top:0;white-space:nowrap}.leaflet-touch .leaflet-draw-actions{left:32px}.leaflet-right .leaflet-draw-actions{right:26px;left:auto}.leaflet-touch .leaflet-right .leaflet-draw-actions{right:32px;left:auto}.leaflet-draw-actions li{display:inline-block}\n.leaflet-draw-actions li:first-child a{border-left:0}.leaflet-draw-actions li:last-child a{-webkit-border-radius:0 4px 4px 0;border-radius:0 4px 4px 0}.leaflet-right .leaflet-draw-actions li:last-child a{-webkit-border-radius:0;border-radius:0}.leaflet-right .leaflet-draw-actions li:first-child a{-webkit-border-radius:4px 0 0 4px;border-radius:4px 0 0 4px}.leaflet-draw-actions a{background-color:#919187;border-left:1px solid #AAA;color:#FFF;font:11px/19px \"Helvetica Neue\",Arial,Helvetica,sans-serif;line-height:28px;text-decoration:none;padding-left:10px;padding-right:10px;height:28px}\n.leaflet-touch .leaflet-draw-actions a{font-size:12px;line-height:30px;height:30px}.leaflet-draw-actions-bottom{margin-top:0}.leaflet-draw-actions-top{margin-top:1px}.leaflet-draw-actions-top a,.leaflet-draw-actions-bottom a{height:27px;line-height:27px}.leaflet-draw-actions a:hover{background-color:#a0a098}.leaflet-draw-actions-top.leaflet-draw-actions-bottom a{height:26px;line-height:26px}.leaflet-draw-toolbar .leaflet-draw-draw-polyline{background-position:-2px -2px}.leaflet-touch .leaflet-draw-toolbar .leaflet-draw-draw-polyline{background-position:0 -1px}\n.leaflet-draw-toolbar .leaflet-draw-draw-polygon{background-position:-31px -2px}.leaflet-touch .leaflet-draw-toolbar .leaflet-draw-draw-polygon{background-position:-29px -1px}.leaflet-draw-toolbar .leaflet-draw-draw-rectangle{background-position:-62px -2px}.leaflet-touch .leaflet-draw-toolbar .leaflet-draw-draw-rectangle{background-position:-60px -1px}.leaflet-draw-toolbar .leaflet-draw-draw-circle{background-position:-92px -2px}.leaflet-touch .leaflet-draw-toolbar .leaflet-draw-draw-circle{background-position:-90px -1px}\n.leaflet-draw-toolbar .leaflet-draw-draw-marker{background-position:-122px -2px}.leaflet-touch .leaflet-draw-toolbar .leaflet-draw-draw-marker{background-position:-120px -1px}.leaflet-draw-toolbar .leaflet-draw-draw-circlemarker{background-position:-273px -2px}.leaflet-touch .leaflet-draw-toolbar .leaflet-draw-draw-circlemarker{background-position:-271px -1px}.leaflet-draw-toolbar .leaflet-draw-edit-edit{background-position:-152px -2px}.leaflet-touch .leaflet-draw-toolbar .leaflet-draw-edit-edit{background-position:-150px -1px}\n.leaflet-draw-toolbar .leaflet-draw-edit-remove{background-position:-182px -2px}.leaflet-touch .leaflet-draw-toolbar .leaflet-draw-edit-remove{background-position:-180px -1px}.leaflet-draw-toolbar .leaflet-draw-edit-edit.leaflet-disabled{background-position:-212px -2px}.leaflet-touch .leaflet-draw-toolbar .leaflet-draw-edit-edit.leaflet-disabled{background-position:-210px -1px}.leaflet-draw-toolbar .leaflet-draw-edit-remove.leaflet-disabled{background-position:-242px -2px}.leaflet-touch .leaflet-draw-toolbar .leaflet-draw-edit-remove.leaflet-disabled{background-position:-240px -2px}\n.leaflet-mouse-marker{background-color:#fff;cursor:crosshair}.leaflet-draw-tooltip{background:#363636;background:rgba(0,0,0,0.5);border:1px solid transparent;-webkit-border-radius:4px;border-radius:4px;color:#fff;font:12px/18px \"Helvetica Neue\",Arial,Helvetica,sans-serif;margin-left:20px;margin-top:-21px;padding:4px 8px;position:absolute;visibility:hidden;white-space:nowrap;z-index:6}.leaflet-draw-tooltip:before{border-right:6px solid black;border-right-color:rgba(0,0,0,0.5);border-top:6px solid transparent;border-bottom:6px solid transparent;content:\"\";position:absolute;top:7px;left:-7px}\n.leaflet-error-draw-tooltip{background-color:#f2dede;border:1px solid #e6b6bd;color:#b94a48}.leaflet-error-draw-tooltip:before{border-right-color:#e6b6bd}.leaflet-draw-tooltip-single{margin-top:-12px}.leaflet-draw-tooltip-subtext{color:#f8d5e4}.leaflet-draw-guide-dash{font-size:1%;opacity:.6;position:absolute;width:5px;height:5px}.leaflet-edit-marker-selected{background-color:rgba(254,87,161,0.1);border:4px dashed rgba(254,87,161,0.6);-webkit-border-radius:4px;border-radius:4px;box-sizing:content-box}\n.leaflet-edit-move{cursor:move}.leaflet-edit-resize{cursor:pointer}.leaflet-oldie .leaflet-draw-toolbar{border:1px solid #999}", ""]);
 	
 	// exports
 
 
 /***/ }),
-/* 22 */
+/* 24 */
 /***/ (function(module, exports, __webpack_require__) {
 
 	module.exports = __webpack_require__.p + "deac1d4aa2ccf7ed832e4db55bb64e63.png";
 
 /***/ }),
-/* 23 */
+/* 25 */
 /***/ (function(module, exports, __webpack_require__) {
 
 	module.exports = __webpack_require__.p + "fd5728f2cf777b06b966d05c0c823dc9.svg";
 
 /***/ }),
-/* 24 */
+/* 26 */
 /***/ (function(module, exports, __webpack_require__) {
 
 	module.exports = __webpack_require__.p + "6a1e950d14904d4b6fb5c9bdc3dfad06.png";
 
 /***/ }),
-/* 25 */
+/* 27 */
 /***/ (function(module, exports, __webpack_require__) {
 
 	// style-loader: Adds some css to the DOM by adding a <style> tag
 	
 	// load the styles
-	var content = __webpack_require__(26);
+	var content = __webpack_require__(28);
 	if(typeof content === 'string') content = [[module.id, content, '']];
 	// add the styles to the DOM
-	var update = __webpack_require__(17)(content, {});
+	var update = __webpack_require__(12)(content, {});
 	if(content.locals) module.exports = content.locals;
 	// Hot Module Replacement
 	if(false) {
@@ -23723,48 +23837,48 @@
 	}
 
 /***/ }),
-/* 26 */
+/* 28 */
 /***/ (function(module, exports, __webpack_require__) {
 
-	exports = module.exports = __webpack_require__(14)();
+	exports = module.exports = __webpack_require__(11)();
 	// imports
 	
 	
 	// module
-	exports.push([module.id, "/* required styles */\r\n\r\n.leaflet-pane,\r\n.leaflet-tile,\r\n.leaflet-marker-icon,\r\n.leaflet-marker-shadow,\r\n.leaflet-tile-container,\r\n.leaflet-pane > svg,\r\n.leaflet-pane > canvas,\r\n.leaflet-zoom-box,\r\n.leaflet-image-layer,\r\n.leaflet-layer {\r\n\tposition: absolute;\r\n\tleft: 0;\r\n\ttop: 0;\r\n\t}\r\n.leaflet-container {\r\n\toverflow: hidden;\r\n\t}\r\n.leaflet-tile,\r\n.leaflet-marker-icon,\r\n.leaflet-marker-shadow {\r\n\t-webkit-user-select: none;\r\n\t   -moz-user-select: none;\r\n\t        user-select: none;\r\n\t  -webkit-user-drag: none;\r\n\t}\r\n/* Safari renders non-retina tile on retina better with this, but Chrome is worse */\r\n.leaflet-safari .leaflet-tile {\r\n\timage-rendering: -webkit-optimize-contrast;\r\n\t}\r\n/* hack that prevents hw layers \"stretching\" when loading new tiles */\r\n.leaflet-safari .leaflet-tile-container {\r\n\twidth: 1600px;\r\n\theight: 1600px;\r\n\t-webkit-transform-origin: 0 0;\r\n\t}\r\n.leaflet-marker-icon,\r\n.leaflet-marker-shadow {\r\n\tdisplay: block;\r\n\t}\r\n/* .leaflet-container svg: reset svg max-width decleration shipped in Joomla! (joomla.org) 3.x */\r\n/* .leaflet-container img: map is broken in FF if you have max-width: 100% on tiles */\r\n.leaflet-container .leaflet-overlay-pane svg,\r\n.leaflet-container .leaflet-marker-pane img,\r\n.leaflet-container .leaflet-shadow-pane img,\r\n.leaflet-container .leaflet-tile-pane img,\r\n.leaflet-container img.leaflet-image-layer {\r\n\tmax-width: none !important;\r\n\tmax-height: none !important;\r\n\t}\r\n\r\n.leaflet-container.leaflet-touch-zoom {\r\n\t-ms-touch-action: pan-x pan-y;\r\n\ttouch-action: pan-x pan-y;\r\n\t}\r\n.leaflet-container.leaflet-touch-drag {\r\n\t-ms-touch-action: pinch-zoom;\r\n\t/* Fallback for FF which doesn't support pinch-zoom */\r\n\ttouch-action: none;\r\n\ttouch-action: pinch-zoom;\r\n}\r\n.leaflet-container.leaflet-touch-drag.leaflet-touch-zoom {\r\n\t-ms-touch-action: none;\r\n\ttouch-action: none;\r\n}\r\n.leaflet-container {\r\n\t-webkit-tap-highlight-color: transparent;\r\n}\r\n.leaflet-container a {\r\n\t-webkit-tap-highlight-color: rgba(51, 181, 229, 0.4);\r\n}\r\n.leaflet-tile {\r\n\tfilter: inherit;\r\n\tvisibility: hidden;\r\n\t}\r\n.leaflet-tile-loaded {\r\n\tvisibility: inherit;\r\n\t}\r\n.leaflet-zoom-box {\r\n\twidth: 0;\r\n\theight: 0;\r\n\t-moz-box-sizing: border-box;\r\n\t     box-sizing: border-box;\r\n\tz-index: 800;\r\n\t}\r\n/* workaround for https://bugzilla.mozilla.org/show_bug.cgi?id=888319 */\r\n.leaflet-overlay-pane svg {\r\n\t-moz-user-select: none;\r\n\t}\r\n\r\n.leaflet-pane         { z-index: 400; }\r\n\r\n.leaflet-tile-pane    { z-index: 200; }\r\n.leaflet-overlay-pane { z-index: 400; }\r\n.leaflet-shadow-pane  { z-index: 500; }\r\n.leaflet-marker-pane  { z-index: 600; }\r\n.leaflet-tooltip-pane   { z-index: 650; }\r\n.leaflet-popup-pane   { z-index: 700; }\r\n\r\n.leaflet-map-pane canvas { z-index: 100; }\r\n.leaflet-map-pane svg    { z-index: 200; }\r\n\r\n.leaflet-vml-shape {\r\n\twidth: 1px;\r\n\theight: 1px;\r\n\t}\r\n.lvml {\r\n\tbehavior: url(#default#VML);\r\n\tdisplay: inline-block;\r\n\tposition: absolute;\r\n\t}\r\n\r\n\r\n/* control positioning */\r\n\r\n.leaflet-control {\r\n\tposition: relative;\r\n\tz-index: 800;\r\n\tpointer-events: visiblePainted; /* IE 9-10 doesn't have auto */\r\n\tpointer-events: auto;\r\n\t}\r\n.leaflet-top,\r\n.leaflet-bottom {\r\n\tposition: absolute;\r\n\tz-index: 1000;\r\n\tpointer-events: none;\r\n\t}\r\n.leaflet-top {\r\n\ttop: 0;\r\n\t}\r\n.leaflet-right {\r\n\tright: 0;\r\n\t}\r\n.leaflet-bottom {\r\n\tbottom: 0;\r\n\t}\r\n.leaflet-left {\r\n\tleft: 0;\r\n\t}\r\n.leaflet-control {\r\n\tfloat: left;\r\n\tclear: both;\r\n\t}\r\n.leaflet-right .leaflet-control {\r\n\tfloat: right;\r\n\t}\r\n.leaflet-top .leaflet-control {\r\n\tmargin-top: 10px;\r\n\t}\r\n.leaflet-bottom .leaflet-control {\r\n\tmargin-bottom: 10px;\r\n\t}\r\n.leaflet-left .leaflet-control {\r\n\tmargin-left: 10px;\r\n\t}\r\n.leaflet-right .leaflet-control {\r\n\tmargin-right: 10px;\r\n\t}\r\n\r\n\r\n/* zoom and fade animations */\r\n\r\n.leaflet-fade-anim .leaflet-tile {\r\n\twill-change: opacity;\r\n\t}\r\n.leaflet-fade-anim .leaflet-popup {\r\n\topacity: 0;\r\n\t-webkit-transition: opacity 0.2s linear;\r\n\t   -moz-transition: opacity 0.2s linear;\r\n\t     -o-transition: opacity 0.2s linear;\r\n\t        transition: opacity 0.2s linear;\r\n\t}\r\n.leaflet-fade-anim .leaflet-map-pane .leaflet-popup {\r\n\topacity: 1;\r\n\t}\r\n.leaflet-zoom-animated {\r\n\t-webkit-transform-origin: 0 0;\r\n\t    -ms-transform-origin: 0 0;\r\n\t        transform-origin: 0 0;\r\n\t}\r\n.leaflet-zoom-anim .leaflet-zoom-animated {\r\n\twill-change: transform;\r\n\t}\r\n.leaflet-zoom-anim .leaflet-zoom-animated {\r\n\t-webkit-transition: -webkit-transform 0.25s cubic-bezier(0,0,0.25,1);\r\n\t   -moz-transition:    -moz-transform 0.25s cubic-bezier(0,0,0.25,1);\r\n\t     -o-transition:      -o-transform 0.25s cubic-bezier(0,0,0.25,1);\r\n\t        transition:         transform 0.25s cubic-bezier(0,0,0.25,1);\r\n\t}\r\n.leaflet-zoom-anim .leaflet-tile,\r\n.leaflet-pan-anim .leaflet-tile {\r\n\t-webkit-transition: none;\r\n\t   -moz-transition: none;\r\n\t     -o-transition: none;\r\n\t        transition: none;\r\n\t}\r\n\r\n.leaflet-zoom-anim .leaflet-zoom-hide {\r\n\tvisibility: hidden;\r\n\t}\r\n\r\n\r\n/* cursors */\r\n\r\n.leaflet-interactive {\r\n\tcursor: pointer;\r\n\t}\r\n.leaflet-grab {\r\n\tcursor: -webkit-grab;\r\n\tcursor:    -moz-grab;\r\n\t}\r\n.leaflet-crosshair,\r\n.leaflet-crosshair .leaflet-interactive {\r\n\tcursor: crosshair;\r\n\t}\r\n.leaflet-popup-pane,\r\n.leaflet-control {\r\n\tcursor: auto;\r\n\t}\r\n.leaflet-dragging .leaflet-grab,\r\n.leaflet-dragging .leaflet-grab .leaflet-interactive,\r\n.leaflet-dragging .leaflet-marker-draggable {\r\n\tcursor: move;\r\n\tcursor: -webkit-grabbing;\r\n\tcursor:    -moz-grabbing;\r\n\t}\r\n\r\n/* marker & overlays interactivity */\r\n.leaflet-marker-icon,\r\n.leaflet-marker-shadow,\r\n.leaflet-image-layer,\r\n.leaflet-pane > svg path,\r\n.leaflet-tile-container {\r\n\tpointer-events: none;\r\n\t}\r\n\r\n.leaflet-marker-icon.leaflet-interactive,\r\n.leaflet-image-layer.leaflet-interactive,\r\n.leaflet-pane > svg path.leaflet-interactive {\r\n\tpointer-events: visiblePainted; /* IE 9-10 doesn't have auto */\r\n\tpointer-events: auto;\r\n\t}\r\n\r\n/* visual tweaks */\r\n\r\n.leaflet-container {\r\n\tbackground: #ddd;\r\n\toutline: 0;\r\n\t}\r\n.leaflet-container a {\r\n\tcolor: #0078A8;\r\n\t}\r\n.leaflet-container a.leaflet-active {\r\n\toutline: 2px solid orange;\r\n\t}\r\n.leaflet-zoom-box {\r\n\tborder: 2px dotted #38f;\r\n\tbackground: rgba(255,255,255,0.5);\r\n\t}\r\n\r\n\r\n/* general typography */\r\n.leaflet-container {\r\n\tfont: 12px/1.5 \"Helvetica Neue\", Arial, Helvetica, sans-serif;\r\n\t}\r\n\r\n\r\n/* general toolbar styles */\r\n\r\n.leaflet-bar {\r\n\tbox-shadow: 0 1px 5px rgba(0,0,0,0.65);\r\n\tborder-radius: 4px;\r\n\t}\r\n.leaflet-bar a,\r\n.leaflet-bar a:hover {\r\n\tbackground-color: #fff;\r\n\tborder-bottom: 1px solid #ccc;\r\n\twidth: 26px;\r\n\theight: 26px;\r\n\tline-height: 26px;\r\n\tdisplay: block;\r\n\ttext-align: center;\r\n\ttext-decoration: none;\r\n\tcolor: black;\r\n\t}\r\n.leaflet-bar a,\r\n.leaflet-control-layers-toggle {\r\n\tbackground-position: 50% 50%;\r\n\tbackground-repeat: no-repeat;\r\n\tdisplay: block;\r\n\t}\r\n.leaflet-bar a:hover {\r\n\tbackground-color: #f4f4f4;\r\n\t}\r\n.leaflet-bar a:first-child {\r\n\tborder-top-left-radius: 4px;\r\n\tborder-top-right-radius: 4px;\r\n\t}\r\n.leaflet-bar a:last-child {\r\n\tborder-bottom-left-radius: 4px;\r\n\tborder-bottom-right-radius: 4px;\r\n\tborder-bottom: none;\r\n\t}\r\n.leaflet-bar a.leaflet-disabled {\r\n\tcursor: default;\r\n\tbackground-color: #f4f4f4;\r\n\tcolor: #bbb;\r\n\t}\r\n\r\n.leaflet-touch .leaflet-bar a {\r\n\twidth: 30px;\r\n\theight: 30px;\r\n\tline-height: 30px;\r\n\t}\r\n.leaflet-touch .leaflet-bar a:first-child {\r\n\tborder-top-left-radius: 2px;\r\n\tborder-top-right-radius: 2px;\r\n\t}\r\n.leaflet-touch .leaflet-bar a:last-child {\r\n\tborder-bottom-left-radius: 2px;\r\n\tborder-bottom-right-radius: 2px;\r\n\t}\r\n\r\n/* zoom control */\r\n\r\n.leaflet-control-zoom-in,\r\n.leaflet-control-zoom-out {\r\n\tfont: bold 18px 'Lucida Console', Monaco, monospace;\r\n\ttext-indent: 1px;\r\n\t}\r\n\r\n.leaflet-touch .leaflet-control-zoom-in, .leaflet-touch .leaflet-control-zoom-out  {\r\n\tfont-size: 22px;\r\n\t}\r\n\r\n\r\n/* layers control */\r\n\r\n.leaflet-control-layers {\r\n\tbox-shadow: 0 1px 5px rgba(0,0,0,0.4);\r\n\tbackground: #fff;\r\n\tborder-radius: 5px;\r\n\t}\r\n.leaflet-control-layers-toggle {\r\n\tbackground-image: url(" + __webpack_require__(27) + ");\r\n\twidth: 36px;\r\n\theight: 36px;\r\n\t}\r\n.leaflet-retina .leaflet-control-layers-toggle {\r\n\tbackground-image: url(" + __webpack_require__(28) + ");\r\n\tbackground-size: 26px 26px;\r\n\t}\r\n.leaflet-touch .leaflet-control-layers-toggle {\r\n\twidth: 44px;\r\n\theight: 44px;\r\n\t}\r\n.leaflet-control-layers .leaflet-control-layers-list,\r\n.leaflet-control-layers-expanded .leaflet-control-layers-toggle {\r\n\tdisplay: none;\r\n\t}\r\n.leaflet-control-layers-expanded .leaflet-control-layers-list {\r\n\tdisplay: block;\r\n\tposition: relative;\r\n\t}\r\n.leaflet-control-layers-expanded {\r\n\tpadding: 6px 10px 6px 6px;\r\n\tcolor: #333;\r\n\tbackground: #fff;\r\n\t}\r\n.leaflet-control-layers-scrollbar {\r\n\toverflow-y: scroll;\r\n\toverflow-x: hidden;\r\n\tpadding-right: 5px;\r\n\t}\r\n.leaflet-control-layers-selector {\r\n\tmargin-top: 2px;\r\n\tposition: relative;\r\n\ttop: 1px;\r\n\t}\r\n.leaflet-control-layers label {\r\n\tdisplay: block;\r\n\t}\r\n.leaflet-control-layers-separator {\r\n\theight: 0;\r\n\tborder-top: 1px solid #ddd;\r\n\tmargin: 5px -10px 5px -6px;\r\n\t}\r\n\r\n/* Default icon URLs */\r\n.leaflet-default-icon-path {\r\n\tbackground-image: url(" + __webpack_require__(29) + ");\r\n\t}\r\n\r\n\r\n/* attribution and scale controls */\r\n\r\n.leaflet-container .leaflet-control-attribution {\r\n\tbackground: #fff;\r\n\tbackground: rgba(255, 255, 255, 0.7);\r\n\tmargin: 0;\r\n\t}\r\n.leaflet-control-attribution,\r\n.leaflet-control-scale-line {\r\n\tpadding: 0 5px;\r\n\tcolor: #333;\r\n\t}\r\n.leaflet-control-attribution a {\r\n\ttext-decoration: none;\r\n\t}\r\n.leaflet-control-attribution a:hover {\r\n\ttext-decoration: underline;\r\n\t}\r\n.leaflet-container .leaflet-control-attribution,\r\n.leaflet-container .leaflet-control-scale {\r\n\tfont-size: 11px;\r\n\t}\r\n.leaflet-left .leaflet-control-scale {\r\n\tmargin-left: 5px;\r\n\t}\r\n.leaflet-bottom .leaflet-control-scale {\r\n\tmargin-bottom: 5px;\r\n\t}\r\n.leaflet-control-scale-line {\r\n\tborder: 2px solid #777;\r\n\tborder-top: none;\r\n\tline-height: 1.1;\r\n\tpadding: 2px 5px 1px;\r\n\tfont-size: 11px;\r\n\twhite-space: nowrap;\r\n\toverflow: hidden;\r\n\t-moz-box-sizing: border-box;\r\n\t     box-sizing: border-box;\r\n\r\n\tbackground: #fff;\r\n\tbackground: rgba(255, 255, 255, 0.5);\r\n\t}\r\n.leaflet-control-scale-line:not(:first-child) {\r\n\tborder-top: 2px solid #777;\r\n\tborder-bottom: none;\r\n\tmargin-top: -2px;\r\n\t}\r\n.leaflet-control-scale-line:not(:first-child):not(:last-child) {\r\n\tborder-bottom: 2px solid #777;\r\n\t}\r\n\r\n.leaflet-touch .leaflet-control-attribution,\r\n.leaflet-touch .leaflet-control-layers,\r\n.leaflet-touch .leaflet-bar {\r\n\tbox-shadow: none;\r\n\t}\r\n.leaflet-touch .leaflet-control-layers,\r\n.leaflet-touch .leaflet-bar {\r\n\tborder: 2px solid rgba(0,0,0,0.2);\r\n\tbackground-clip: padding-box;\r\n\t}\r\n\r\n\r\n/* popup */\r\n\r\n.leaflet-popup {\r\n\tposition: absolute;\r\n\ttext-align: center;\r\n\tmargin-bottom: 20px;\r\n\t}\r\n.leaflet-popup-content-wrapper {\r\n\tpadding: 1px;\r\n\ttext-align: left;\r\n\tborder-radius: 12px;\r\n\t}\r\n.leaflet-popup-content {\r\n\tmargin: 13px 19px;\r\n\tline-height: 1.4;\r\n\t}\r\n.leaflet-popup-content p {\r\n\tmargin: 18px 0;\r\n\t}\r\n.leaflet-popup-tip-container {\r\n\twidth: 40px;\r\n\theight: 20px;\r\n\tposition: absolute;\r\n\tleft: 50%;\r\n\tmargin-left: -20px;\r\n\toverflow: hidden;\r\n\tpointer-events: none;\r\n\t}\r\n.leaflet-popup-tip {\r\n\twidth: 17px;\r\n\theight: 17px;\r\n\tpadding: 1px;\r\n\r\n\tmargin: -10px auto 0;\r\n\r\n\t-webkit-transform: rotate(45deg);\r\n\t   -moz-transform: rotate(45deg);\r\n\t    -ms-transform: rotate(45deg);\r\n\t     -o-transform: rotate(45deg);\r\n\t        transform: rotate(45deg);\r\n\t}\r\n.leaflet-popup-content-wrapper,\r\n.leaflet-popup-tip {\r\n\tbackground: white;\r\n\tcolor: #333;\r\n\tbox-shadow: 0 3px 14px rgba(0,0,0,0.4);\r\n\t}\r\n.leaflet-container a.leaflet-popup-close-button {\r\n\tposition: absolute;\r\n\ttop: 0;\r\n\tright: 0;\r\n\tpadding: 4px 4px 0 0;\r\n\tborder: none;\r\n\ttext-align: center;\r\n\twidth: 18px;\r\n\theight: 14px;\r\n\tfont: 16px/14px Tahoma, Verdana, sans-serif;\r\n\tcolor: #c3c3c3;\r\n\ttext-decoration: none;\r\n\tfont-weight: bold;\r\n\tbackground: transparent;\r\n\t}\r\n.leaflet-container a.leaflet-popup-close-button:hover {\r\n\tcolor: #999;\r\n\t}\r\n.leaflet-popup-scrolled {\r\n\toverflow: auto;\r\n\tborder-bottom: 1px solid #ddd;\r\n\tborder-top: 1px solid #ddd;\r\n\t}\r\n\r\n.leaflet-oldie .leaflet-popup-content-wrapper {\r\n\tzoom: 1;\r\n\t}\r\n.leaflet-oldie .leaflet-popup-tip {\r\n\twidth: 24px;\r\n\tmargin: 0 auto;\r\n\r\n\t-ms-filter: \"progid:DXImageTransform.Microsoft.Matrix(M11=0.70710678, M12=0.70710678, M21=-0.70710678, M22=0.70710678)\";\r\n\tfilter: progid:DXImageTransform.Microsoft.Matrix(M11=0.70710678, M12=0.70710678, M21=-0.70710678, M22=0.70710678);\r\n\t}\r\n.leaflet-oldie .leaflet-popup-tip-container {\r\n\tmargin-top: -1px;\r\n\t}\r\n\r\n.leaflet-oldie .leaflet-control-zoom,\r\n.leaflet-oldie .leaflet-control-layers,\r\n.leaflet-oldie .leaflet-popup-content-wrapper,\r\n.leaflet-oldie .leaflet-popup-tip {\r\n\tborder: 1px solid #999;\r\n\t}\r\n\r\n\r\n/* div icon */\r\n\r\n.leaflet-div-icon {\r\n\tbackground: #fff;\r\n\tborder: 1px solid #666;\r\n\t}\r\n\r\n\r\n/* Tooltip */\r\n/* Base styles for the element that has a tooltip */\r\n.leaflet-tooltip {\r\n\tposition: absolute;\r\n\tpadding: 6px;\r\n\tbackground-color: #fff;\r\n\tborder: 1px solid #fff;\r\n\tborder-radius: 3px;\r\n\tcolor: #222;\r\n\twhite-space: nowrap;\r\n\t-webkit-user-select: none;\r\n\t-moz-user-select: none;\r\n\t-ms-user-select: none;\r\n\tuser-select: none;\r\n\tpointer-events: none;\r\n\tbox-shadow: 0 1px 3px rgba(0,0,0,0.4);\r\n\t}\r\n.leaflet-tooltip.leaflet-clickable {\r\n\tcursor: pointer;\r\n\tpointer-events: auto;\r\n\t}\r\n.leaflet-tooltip-top:before,\r\n.leaflet-tooltip-bottom:before,\r\n.leaflet-tooltip-left:before,\r\n.leaflet-tooltip-right:before {\r\n\tposition: absolute;\r\n\tpointer-events: none;\r\n\tborder: 6px solid transparent;\r\n\tbackground: transparent;\r\n\tcontent: \"\";\r\n\t}\r\n\r\n/* Directions */\r\n\r\n.leaflet-tooltip-bottom {\r\n\tmargin-top: 6px;\r\n}\r\n.leaflet-tooltip-top {\r\n\tmargin-top: -6px;\r\n}\r\n.leaflet-tooltip-bottom:before,\r\n.leaflet-tooltip-top:before {\r\n\tleft: 50%;\r\n\tmargin-left: -6px;\r\n\t}\r\n.leaflet-tooltip-top:before {\r\n\tbottom: 0;\r\n\tmargin-bottom: -12px;\r\n\tborder-top-color: #fff;\r\n\t}\r\n.leaflet-tooltip-bottom:before {\r\n\ttop: 0;\r\n\tmargin-top: -12px;\r\n\tmargin-left: -6px;\r\n\tborder-bottom-color: #fff;\r\n\t}\r\n.leaflet-tooltip-left {\r\n\tmargin-left: -6px;\r\n}\r\n.leaflet-tooltip-right {\r\n\tmargin-left: 6px;\r\n}\r\n.leaflet-tooltip-left:before,\r\n.leaflet-tooltip-right:before {\r\n\ttop: 50%;\r\n\tmargin-top: -6px;\r\n\t}\r\n.leaflet-tooltip-left:before {\r\n\tright: 0;\r\n\tmargin-right: -12px;\r\n\tborder-left-color: #fff;\r\n\t}\r\n.leaflet-tooltip-right:before {\r\n\tleft: 0;\r\n\tmargin-left: -12px;\r\n\tborder-right-color: #fff;\r\n\t}\r\n", ""]);
+	exports.push([module.id, "/* required styles */\r\n\r\n.leaflet-pane,\r\n.leaflet-tile,\r\n.leaflet-marker-icon,\r\n.leaflet-marker-shadow,\r\n.leaflet-tile-container,\r\n.leaflet-pane > svg,\r\n.leaflet-pane > canvas,\r\n.leaflet-zoom-box,\r\n.leaflet-image-layer,\r\n.leaflet-layer {\r\n\tposition: absolute;\r\n\tleft: 0;\r\n\ttop: 0;\r\n\t}\r\n.leaflet-container {\r\n\toverflow: hidden;\r\n\t}\r\n.leaflet-tile,\r\n.leaflet-marker-icon,\r\n.leaflet-marker-shadow {\r\n\t-webkit-user-select: none;\r\n\t   -moz-user-select: none;\r\n\t        user-select: none;\r\n\t  -webkit-user-drag: none;\r\n\t}\r\n/* Safari renders non-retina tile on retina better with this, but Chrome is worse */\r\n.leaflet-safari .leaflet-tile {\r\n\timage-rendering: -webkit-optimize-contrast;\r\n\t}\r\n/* hack that prevents hw layers \"stretching\" when loading new tiles */\r\n.leaflet-safari .leaflet-tile-container {\r\n\twidth: 1600px;\r\n\theight: 1600px;\r\n\t-webkit-transform-origin: 0 0;\r\n\t}\r\n.leaflet-marker-icon,\r\n.leaflet-marker-shadow {\r\n\tdisplay: block;\r\n\t}\r\n/* .leaflet-container svg: reset svg max-width decleration shipped in Joomla! (joomla.org) 3.x */\r\n/* .leaflet-container img: map is broken in FF if you have max-width: 100% on tiles */\r\n.leaflet-container .leaflet-overlay-pane svg,\r\n.leaflet-container .leaflet-marker-pane img,\r\n.leaflet-container .leaflet-shadow-pane img,\r\n.leaflet-container .leaflet-tile-pane img,\r\n.leaflet-container img.leaflet-image-layer {\r\n\tmax-width: none !important;\r\n\tmax-height: none !important;\r\n\t}\r\n\r\n.leaflet-container.leaflet-touch-zoom {\r\n\t-ms-touch-action: pan-x pan-y;\r\n\ttouch-action: pan-x pan-y;\r\n\t}\r\n.leaflet-container.leaflet-touch-drag {\r\n\t-ms-touch-action: pinch-zoom;\r\n\t/* Fallback for FF which doesn't support pinch-zoom */\r\n\ttouch-action: none;\r\n\ttouch-action: pinch-zoom;\r\n}\r\n.leaflet-container.leaflet-touch-drag.leaflet-touch-zoom {\r\n\t-ms-touch-action: none;\r\n\ttouch-action: none;\r\n}\r\n.leaflet-container {\r\n\t-webkit-tap-highlight-color: transparent;\r\n}\r\n.leaflet-container a {\r\n\t-webkit-tap-highlight-color: rgba(51, 181, 229, 0.4);\r\n}\r\n.leaflet-tile {\r\n\tfilter: inherit;\r\n\tvisibility: hidden;\r\n\t}\r\n.leaflet-tile-loaded {\r\n\tvisibility: inherit;\r\n\t}\r\n.leaflet-zoom-box {\r\n\twidth: 0;\r\n\theight: 0;\r\n\t-moz-box-sizing: border-box;\r\n\t     box-sizing: border-box;\r\n\tz-index: 800;\r\n\t}\r\n/* workaround for https://bugzilla.mozilla.org/show_bug.cgi?id=888319 */\r\n.leaflet-overlay-pane svg {\r\n\t-moz-user-select: none;\r\n\t}\r\n\r\n.leaflet-pane         { z-index: 400; }\r\n\r\n.leaflet-tile-pane    { z-index: 200; }\r\n.leaflet-overlay-pane { z-index: 400; }\r\n.leaflet-shadow-pane  { z-index: 500; }\r\n.leaflet-marker-pane  { z-index: 600; }\r\n.leaflet-tooltip-pane   { z-index: 650; }\r\n.leaflet-popup-pane   { z-index: 700; }\r\n\r\n.leaflet-map-pane canvas { z-index: 100; }\r\n.leaflet-map-pane svg    { z-index: 200; }\r\n\r\n.leaflet-vml-shape {\r\n\twidth: 1px;\r\n\theight: 1px;\r\n\t}\r\n.lvml {\r\n\tbehavior: url(#default#VML);\r\n\tdisplay: inline-block;\r\n\tposition: absolute;\r\n\t}\r\n\r\n\r\n/* control positioning */\r\n\r\n.leaflet-control {\r\n\tposition: relative;\r\n\tz-index: 800;\r\n\tpointer-events: visiblePainted; /* IE 9-10 doesn't have auto */\r\n\tpointer-events: auto;\r\n\t}\r\n.leaflet-top,\r\n.leaflet-bottom {\r\n\tposition: absolute;\r\n\tz-index: 1000;\r\n\tpointer-events: none;\r\n\t}\r\n.leaflet-top {\r\n\ttop: 0;\r\n\t}\r\n.leaflet-right {\r\n\tright: 0;\r\n\t}\r\n.leaflet-bottom {\r\n\tbottom: 0;\r\n\t}\r\n.leaflet-left {\r\n\tleft: 0;\r\n\t}\r\n.leaflet-control {\r\n\tfloat: left;\r\n\tclear: both;\r\n\t}\r\n.leaflet-right .leaflet-control {\r\n\tfloat: right;\r\n\t}\r\n.leaflet-top .leaflet-control {\r\n\tmargin-top: 10px;\r\n\t}\r\n.leaflet-bottom .leaflet-control {\r\n\tmargin-bottom: 10px;\r\n\t}\r\n.leaflet-left .leaflet-control {\r\n\tmargin-left: 10px;\r\n\t}\r\n.leaflet-right .leaflet-control {\r\n\tmargin-right: 10px;\r\n\t}\r\n\r\n\r\n/* zoom and fade animations */\r\n\r\n.leaflet-fade-anim .leaflet-tile {\r\n\twill-change: opacity;\r\n\t}\r\n.leaflet-fade-anim .leaflet-popup {\r\n\topacity: 0;\r\n\t-webkit-transition: opacity 0.2s linear;\r\n\t   -moz-transition: opacity 0.2s linear;\r\n\t     -o-transition: opacity 0.2s linear;\r\n\t        transition: opacity 0.2s linear;\r\n\t}\r\n.leaflet-fade-anim .leaflet-map-pane .leaflet-popup {\r\n\topacity: 1;\r\n\t}\r\n.leaflet-zoom-animated {\r\n\t-webkit-transform-origin: 0 0;\r\n\t    -ms-transform-origin: 0 0;\r\n\t        transform-origin: 0 0;\r\n\t}\r\n.leaflet-zoom-anim .leaflet-zoom-animated {\r\n\twill-change: transform;\r\n\t}\r\n.leaflet-zoom-anim .leaflet-zoom-animated {\r\n\t-webkit-transition: -webkit-transform 0.25s cubic-bezier(0,0,0.25,1);\r\n\t   -moz-transition:    -moz-transform 0.25s cubic-bezier(0,0,0.25,1);\r\n\t     -o-transition:      -o-transform 0.25s cubic-bezier(0,0,0.25,1);\r\n\t        transition:         transform 0.25s cubic-bezier(0,0,0.25,1);\r\n\t}\r\n.leaflet-zoom-anim .leaflet-tile,\r\n.leaflet-pan-anim .leaflet-tile {\r\n\t-webkit-transition: none;\r\n\t   -moz-transition: none;\r\n\t     -o-transition: none;\r\n\t        transition: none;\r\n\t}\r\n\r\n.leaflet-zoom-anim .leaflet-zoom-hide {\r\n\tvisibility: hidden;\r\n\t}\r\n\r\n\r\n/* cursors */\r\n\r\n.leaflet-interactive {\r\n\tcursor: pointer;\r\n\t}\r\n.leaflet-grab {\r\n\tcursor: -webkit-grab;\r\n\tcursor:    -moz-grab;\r\n\t}\r\n.leaflet-crosshair,\r\n.leaflet-crosshair .leaflet-interactive {\r\n\tcursor: crosshair;\r\n\t}\r\n.leaflet-popup-pane,\r\n.leaflet-control {\r\n\tcursor: auto;\r\n\t}\r\n.leaflet-dragging .leaflet-grab,\r\n.leaflet-dragging .leaflet-grab .leaflet-interactive,\r\n.leaflet-dragging .leaflet-marker-draggable {\r\n\tcursor: move;\r\n\tcursor: -webkit-grabbing;\r\n\tcursor:    -moz-grabbing;\r\n\t}\r\n\r\n/* marker & overlays interactivity */\r\n.leaflet-marker-icon,\r\n.leaflet-marker-shadow,\r\n.leaflet-image-layer,\r\n.leaflet-pane > svg path,\r\n.leaflet-tile-container {\r\n\tpointer-events: none;\r\n\t}\r\n\r\n.leaflet-marker-icon.leaflet-interactive,\r\n.leaflet-image-layer.leaflet-interactive,\r\n.leaflet-pane > svg path.leaflet-interactive {\r\n\tpointer-events: visiblePainted; /* IE 9-10 doesn't have auto */\r\n\tpointer-events: auto;\r\n\t}\r\n\r\n/* visual tweaks */\r\n\r\n.leaflet-container {\r\n\tbackground: #ddd;\r\n\toutline: 0;\r\n\t}\r\n.leaflet-container a {\r\n\tcolor: #0078A8;\r\n\t}\r\n.leaflet-container a.leaflet-active {\r\n\toutline: 2px solid orange;\r\n\t}\r\n.leaflet-zoom-box {\r\n\tborder: 2px dotted #38f;\r\n\tbackground: rgba(255,255,255,0.5);\r\n\t}\r\n\r\n\r\n/* general typography */\r\n.leaflet-container {\r\n\tfont: 12px/1.5 \"Helvetica Neue\", Arial, Helvetica, sans-serif;\r\n\t}\r\n\r\n\r\n/* general toolbar styles */\r\n\r\n.leaflet-bar {\r\n\tbox-shadow: 0 1px 5px rgba(0,0,0,0.65);\r\n\tborder-radius: 4px;\r\n\t}\r\n.leaflet-bar a,\r\n.leaflet-bar a:hover {\r\n\tbackground-color: #fff;\r\n\tborder-bottom: 1px solid #ccc;\r\n\twidth: 26px;\r\n\theight: 26px;\r\n\tline-height: 26px;\r\n\tdisplay: block;\r\n\ttext-align: center;\r\n\ttext-decoration: none;\r\n\tcolor: black;\r\n\t}\r\n.leaflet-bar a,\r\n.leaflet-control-layers-toggle {\r\n\tbackground-position: 50% 50%;\r\n\tbackground-repeat: no-repeat;\r\n\tdisplay: block;\r\n\t}\r\n.leaflet-bar a:hover {\r\n\tbackground-color: #f4f4f4;\r\n\t}\r\n.leaflet-bar a:first-child {\r\n\tborder-top-left-radius: 4px;\r\n\tborder-top-right-radius: 4px;\r\n\t}\r\n.leaflet-bar a:last-child {\r\n\tborder-bottom-left-radius: 4px;\r\n\tborder-bottom-right-radius: 4px;\r\n\tborder-bottom: none;\r\n\t}\r\n.leaflet-bar a.leaflet-disabled {\r\n\tcursor: default;\r\n\tbackground-color: #f4f4f4;\r\n\tcolor: #bbb;\r\n\t}\r\n\r\n.leaflet-touch .leaflet-bar a {\r\n\twidth: 30px;\r\n\theight: 30px;\r\n\tline-height: 30px;\r\n\t}\r\n.leaflet-touch .leaflet-bar a:first-child {\r\n\tborder-top-left-radius: 2px;\r\n\tborder-top-right-radius: 2px;\r\n\t}\r\n.leaflet-touch .leaflet-bar a:last-child {\r\n\tborder-bottom-left-radius: 2px;\r\n\tborder-bottom-right-radius: 2px;\r\n\t}\r\n\r\n/* zoom control */\r\n\r\n.leaflet-control-zoom-in,\r\n.leaflet-control-zoom-out {\r\n\tfont: bold 18px 'Lucida Console', Monaco, monospace;\r\n\ttext-indent: 1px;\r\n\t}\r\n\r\n.leaflet-touch .leaflet-control-zoom-in, .leaflet-touch .leaflet-control-zoom-out  {\r\n\tfont-size: 22px;\r\n\t}\r\n\r\n\r\n/* layers control */\r\n\r\n.leaflet-control-layers {\r\n\tbox-shadow: 0 1px 5px rgba(0,0,0,0.4);\r\n\tbackground: #fff;\r\n\tborder-radius: 5px;\r\n\t}\r\n.leaflet-control-layers-toggle {\r\n\tbackground-image: url(" + __webpack_require__(29) + ");\r\n\twidth: 36px;\r\n\theight: 36px;\r\n\t}\r\n.leaflet-retina .leaflet-control-layers-toggle {\r\n\tbackground-image: url(" + __webpack_require__(30) + ");\r\n\tbackground-size: 26px 26px;\r\n\t}\r\n.leaflet-touch .leaflet-control-layers-toggle {\r\n\twidth: 44px;\r\n\theight: 44px;\r\n\t}\r\n.leaflet-control-layers .leaflet-control-layers-list,\r\n.leaflet-control-layers-expanded .leaflet-control-layers-toggle {\r\n\tdisplay: none;\r\n\t}\r\n.leaflet-control-layers-expanded .leaflet-control-layers-list {\r\n\tdisplay: block;\r\n\tposition: relative;\r\n\t}\r\n.leaflet-control-layers-expanded {\r\n\tpadding: 6px 10px 6px 6px;\r\n\tcolor: #333;\r\n\tbackground: #fff;\r\n\t}\r\n.leaflet-control-layers-scrollbar {\r\n\toverflow-y: scroll;\r\n\toverflow-x: hidden;\r\n\tpadding-right: 5px;\r\n\t}\r\n.leaflet-control-layers-selector {\r\n\tmargin-top: 2px;\r\n\tposition: relative;\r\n\ttop: 1px;\r\n\t}\r\n.leaflet-control-layers label {\r\n\tdisplay: block;\r\n\t}\r\n.leaflet-control-layers-separator {\r\n\theight: 0;\r\n\tborder-top: 1px solid #ddd;\r\n\tmargin: 5px -10px 5px -6px;\r\n\t}\r\n\r\n/* Default icon URLs */\r\n.leaflet-default-icon-path {\r\n\tbackground-image: url(" + __webpack_require__(31) + ");\r\n\t}\r\n\r\n\r\n/* attribution and scale controls */\r\n\r\n.leaflet-container .leaflet-control-attribution {\r\n\tbackground: #fff;\r\n\tbackground: rgba(255, 255, 255, 0.7);\r\n\tmargin: 0;\r\n\t}\r\n.leaflet-control-attribution,\r\n.leaflet-control-scale-line {\r\n\tpadding: 0 5px;\r\n\tcolor: #333;\r\n\t}\r\n.leaflet-control-attribution a {\r\n\ttext-decoration: none;\r\n\t}\r\n.leaflet-control-attribution a:hover {\r\n\ttext-decoration: underline;\r\n\t}\r\n.leaflet-container .leaflet-control-attribution,\r\n.leaflet-container .leaflet-control-scale {\r\n\tfont-size: 11px;\r\n\t}\r\n.leaflet-left .leaflet-control-scale {\r\n\tmargin-left: 5px;\r\n\t}\r\n.leaflet-bottom .leaflet-control-scale {\r\n\tmargin-bottom: 5px;\r\n\t}\r\n.leaflet-control-scale-line {\r\n\tborder: 2px solid #777;\r\n\tborder-top: none;\r\n\tline-height: 1.1;\r\n\tpadding: 2px 5px 1px;\r\n\tfont-size: 11px;\r\n\twhite-space: nowrap;\r\n\toverflow: hidden;\r\n\t-moz-box-sizing: border-box;\r\n\t     box-sizing: border-box;\r\n\r\n\tbackground: #fff;\r\n\tbackground: rgba(255, 255, 255, 0.5);\r\n\t}\r\n.leaflet-control-scale-line:not(:first-child) {\r\n\tborder-top: 2px solid #777;\r\n\tborder-bottom: none;\r\n\tmargin-top: -2px;\r\n\t}\r\n.leaflet-control-scale-line:not(:first-child):not(:last-child) {\r\n\tborder-bottom: 2px solid #777;\r\n\t}\r\n\r\n.leaflet-touch .leaflet-control-attribution,\r\n.leaflet-touch .leaflet-control-layers,\r\n.leaflet-touch .leaflet-bar {\r\n\tbox-shadow: none;\r\n\t}\r\n.leaflet-touch .leaflet-control-layers,\r\n.leaflet-touch .leaflet-bar {\r\n\tborder: 2px solid rgba(0,0,0,0.2);\r\n\tbackground-clip: padding-box;\r\n\t}\r\n\r\n\r\n/* popup */\r\n\r\n.leaflet-popup {\r\n\tposition: absolute;\r\n\ttext-align: center;\r\n\tmargin-bottom: 20px;\r\n\t}\r\n.leaflet-popup-content-wrapper {\r\n\tpadding: 1px;\r\n\ttext-align: left;\r\n\tborder-radius: 12px;\r\n\t}\r\n.leaflet-popup-content {\r\n\tmargin: 13px 19px;\r\n\tline-height: 1.4;\r\n\t}\r\n.leaflet-popup-content p {\r\n\tmargin: 18px 0;\r\n\t}\r\n.leaflet-popup-tip-container {\r\n\twidth: 40px;\r\n\theight: 20px;\r\n\tposition: absolute;\r\n\tleft: 50%;\r\n\tmargin-left: -20px;\r\n\toverflow: hidden;\r\n\tpointer-events: none;\r\n\t}\r\n.leaflet-popup-tip {\r\n\twidth: 17px;\r\n\theight: 17px;\r\n\tpadding: 1px;\r\n\r\n\tmargin: -10px auto 0;\r\n\r\n\t-webkit-transform: rotate(45deg);\r\n\t   -moz-transform: rotate(45deg);\r\n\t    -ms-transform: rotate(45deg);\r\n\t     -o-transform: rotate(45deg);\r\n\t        transform: rotate(45deg);\r\n\t}\r\n.leaflet-popup-content-wrapper,\r\n.leaflet-popup-tip {\r\n\tbackground: white;\r\n\tcolor: #333;\r\n\tbox-shadow: 0 3px 14px rgba(0,0,0,0.4);\r\n\t}\r\n.leaflet-container a.leaflet-popup-close-button {\r\n\tposition: absolute;\r\n\ttop: 0;\r\n\tright: 0;\r\n\tpadding: 4px 4px 0 0;\r\n\tborder: none;\r\n\ttext-align: center;\r\n\twidth: 18px;\r\n\theight: 14px;\r\n\tfont: 16px/14px Tahoma, Verdana, sans-serif;\r\n\tcolor: #c3c3c3;\r\n\ttext-decoration: none;\r\n\tfont-weight: bold;\r\n\tbackground: transparent;\r\n\t}\r\n.leaflet-container a.leaflet-popup-close-button:hover {\r\n\tcolor: #999;\r\n\t}\r\n.leaflet-popup-scrolled {\r\n\toverflow: auto;\r\n\tborder-bottom: 1px solid #ddd;\r\n\tborder-top: 1px solid #ddd;\r\n\t}\r\n\r\n.leaflet-oldie .leaflet-popup-content-wrapper {\r\n\tzoom: 1;\r\n\t}\r\n.leaflet-oldie .leaflet-popup-tip {\r\n\twidth: 24px;\r\n\tmargin: 0 auto;\r\n\r\n\t-ms-filter: \"progid:DXImageTransform.Microsoft.Matrix(M11=0.70710678, M12=0.70710678, M21=-0.70710678, M22=0.70710678)\";\r\n\tfilter: progid:DXImageTransform.Microsoft.Matrix(M11=0.70710678, M12=0.70710678, M21=-0.70710678, M22=0.70710678);\r\n\t}\r\n.leaflet-oldie .leaflet-popup-tip-container {\r\n\tmargin-top: -1px;\r\n\t}\r\n\r\n.leaflet-oldie .leaflet-control-zoom,\r\n.leaflet-oldie .leaflet-control-layers,\r\n.leaflet-oldie .leaflet-popup-content-wrapper,\r\n.leaflet-oldie .leaflet-popup-tip {\r\n\tborder: 1px solid #999;\r\n\t}\r\n\r\n\r\n/* div icon */\r\n\r\n.leaflet-div-icon {\r\n\tbackground: #fff;\r\n\tborder: 1px solid #666;\r\n\t}\r\n\r\n\r\n/* Tooltip */\r\n/* Base styles for the element that has a tooltip */\r\n.leaflet-tooltip {\r\n\tposition: absolute;\r\n\tpadding: 6px;\r\n\tbackground-color: #fff;\r\n\tborder: 1px solid #fff;\r\n\tborder-radius: 3px;\r\n\tcolor: #222;\r\n\twhite-space: nowrap;\r\n\t-webkit-user-select: none;\r\n\t-moz-user-select: none;\r\n\t-ms-user-select: none;\r\n\tuser-select: none;\r\n\tpointer-events: none;\r\n\tbox-shadow: 0 1px 3px rgba(0,0,0,0.4);\r\n\t}\r\n.leaflet-tooltip.leaflet-clickable {\r\n\tcursor: pointer;\r\n\tpointer-events: auto;\r\n\t}\r\n.leaflet-tooltip-top:before,\r\n.leaflet-tooltip-bottom:before,\r\n.leaflet-tooltip-left:before,\r\n.leaflet-tooltip-right:before {\r\n\tposition: absolute;\r\n\tpointer-events: none;\r\n\tborder: 6px solid transparent;\r\n\tbackground: transparent;\r\n\tcontent: \"\";\r\n\t}\r\n\r\n/* Directions */\r\n\r\n.leaflet-tooltip-bottom {\r\n\tmargin-top: 6px;\r\n}\r\n.leaflet-tooltip-top {\r\n\tmargin-top: -6px;\r\n}\r\n.leaflet-tooltip-bottom:before,\r\n.leaflet-tooltip-top:before {\r\n\tleft: 50%;\r\n\tmargin-left: -6px;\r\n\t}\r\n.leaflet-tooltip-top:before {\r\n\tbottom: 0;\r\n\tmargin-bottom: -12px;\r\n\tborder-top-color: #fff;\r\n\t}\r\n.leaflet-tooltip-bottom:before {\r\n\ttop: 0;\r\n\tmargin-top: -12px;\r\n\tmargin-left: -6px;\r\n\tborder-bottom-color: #fff;\r\n\t}\r\n.leaflet-tooltip-left {\r\n\tmargin-left: -6px;\r\n}\r\n.leaflet-tooltip-right {\r\n\tmargin-left: 6px;\r\n}\r\n.leaflet-tooltip-left:before,\r\n.leaflet-tooltip-right:before {\r\n\ttop: 50%;\r\n\tmargin-top: -6px;\r\n\t}\r\n.leaflet-tooltip-left:before {\r\n\tright: 0;\r\n\tmargin-right: -12px;\r\n\tborder-left-color: #fff;\r\n\t}\r\n.leaflet-tooltip-right:before {\r\n\tleft: 0;\r\n\tmargin-left: -12px;\r\n\tborder-right-color: #fff;\r\n\t}\r\n", ""]);
 	
 	// exports
 
 
 /***/ }),
-/* 27 */
+/* 29 */
 /***/ (function(module, exports, __webpack_require__) {
 
 	module.exports = __webpack_require__.p + "a6137456ed160d7606981aa57c559898.png";
 
 /***/ }),
-/* 28 */
+/* 30 */
 /***/ (function(module, exports, __webpack_require__) {
 
 	module.exports = __webpack_require__.p + "4f0283c6ce28e888000e978e537a6a56.png";
 
 /***/ }),
-/* 29 */
+/* 31 */
 /***/ (function(module, exports, __webpack_require__) {
 
 	module.exports = __webpack_require__.p + "2273e3d8ad9264b7daa5bdbf8e6b47f8.png";
 
 /***/ }),
-/* 30 */
+/* 32 */
 /***/ (function(module, exports, __webpack_require__) {
 
 	// style-loader: Adds some css to the DOM by adding a <style> tag
 	
 	// load the styles
-	var content = __webpack_require__(31);
+	var content = __webpack_require__(33);
 	if(typeof content === 'string') content = [[module.id, content, '']];
 	// add the styles to the DOM
-	var update = __webpack_require__(17)(content, {});
+	var update = __webpack_require__(12)(content, {});
 	if(content.locals) module.exports = content.locals;
 	// Hot Module Replacement
 	if(false) {
@@ -23781,10 +23895,10 @@
 	}
 
 /***/ }),
-/* 31 */
+/* 33 */
 /***/ (function(module, exports, __webpack_require__) {
 
-	exports = module.exports = __webpack_require__(14)();
+	exports = module.exports = __webpack_require__(11)();
 	// imports
 	
 	
@@ -23795,7 +23909,7 @@
 
 
 /***/ }),
-/* 32 */
+/* 34 */
 /***/ (function(module, exports) {
 
 	'use strict';
@@ -24274,7 +24388,7 @@
 	}]);
 
 /***/ }),
-/* 33 */
+/* 35 */
 /***/ (function(module, exports) {
 
 	'use strict';
@@ -24292,7 +24406,7 @@
 	});
 
 /***/ }),
-/* 34 */
+/* 36 */
 /***/ (function(module, exports) {
 
 	'use strict';
@@ -26313,7 +26427,7 @@
 	}]);
 
 /***/ }),
-/* 35 */
+/* 37 */
 /***/ (function(module, exports) {
 
 	'use strict';
@@ -26322,7 +26436,7 @@
 	var eventCaptureFilters = angular.module('eventCaptureFilters', []);
 
 /***/ }),
-/* 36 */
+/* 38 */
 /***/ (function(module, exports) {
 
 	'use strict';
@@ -26629,23 +26743,23 @@
 	})(window, document);
 
 /***/ }),
-/* 37 */
+/* 39 */
 /***/ (function(module, exports) {
 
 	function _toConsumableArray(e){if(Array.isArray(e)){for(var t=0,n=new Array(e.length);t<e.length;t++)n[t]=e[t];return n}return Array.from(e)}function _extends(){return(_extends=Object.assign||function(e){for(var t=1;t<arguments.length;t++){var n=arguments[t];for(var r in n)Object.prototype.hasOwnProperty.call(n,r)&&(e[r]=n[r])}return e}).apply(this,arguments)}function _defineProperty(e,t,n){return t in e?Object.defineProperty(e,t,{value:n,enumerable:!0,configurable:!0,writable:!0}):e[t]=n,e}function _sliceIterator(e,t){var n=[],r=!0,o=!1,a=void 0;try{for(var s,i=e[Symbol.iterator]();!(r=(s=i.next()).done)&&(n.push(s.value),!t||n.length!==t);r=!0);}catch(e){o=!0,a=e}finally{try{r||null==i.return||i.return()}finally{if(o)throw a}}return n}function _slicedToArray(e,t){if(Array.isArray(e))return e;if(Symbol.iterator in Object(e))return _sliceIterator(e,t);throw new TypeError("Invalid attempt to destructure non-iterable instance")}!function(Y,U){var X=U.element.prototype.closest;if(!X){var r=["matches","matchesSelector","webkitMatches","webkitMatchesSelector","msMatches","msMatchesSelector","mozMatches","mozMatchesSelector"].reduce(function(e,t){var n;return null!==(n=e)&&void 0!==n?n:t in document.documentElement?t:null},null);X=function(e){for(var t,n=this[0].parentNode;n!==document.documentElement&&null!=n&&!n[r](e);)n=n.parentNode;return(null===(t=n)||void 0===t?void 0:t[r](e))?U.element(n):U.element()}}function G(){var e,t,n,r;return"pageYOffset"in Y?{scrollTop:Y.pageYOffset,scrollLeft:Y.pageXOffset}:{scrollTop:null!==(e=null!==(t=document.documentElement.scrollTop)&&void 0!==t?t:document.body.scrollTop)&&void 0!==e?e:0,scrollLeft:null!==(n=null!==(r=document.documentElement.scrollLeft)&&void 0!==r?r:document.body.scrollLeft)&&void 0!==n?n:0}}function K(e,t){return e===Y?"clientWidth"===t?Y.innerWidth:Y.innerHeight:e[t]}function c(e,t){var n,r;n=t,r="".concat(e," attribute is deprecated. Pass the options object to vs-repeat attribute instead https://github.com/kamilkp/angular-vs-repeat#options"),console.warn("vs-repeat deprecation: ".concat(r),n[0])}var Q={latch:!1,container:null,scrollParent:null,size:null,offsetBefore:0,offsetAfter:0,scrolledToBeginning:U.noop,scrolledToEnd:U.noop,scrolledToBeginningOffset:0,scrolledToEndOffset:0,scrollMargin:0,horizontal:!1,autoresize:!1,hunked:!1,hunkSize:0},e=U.module("vs-repeat",[]).directive("vsRepeat",["$compile","$parse",function(F,J){return{restrict:"A",scope:!0,compile:function(t,n){var e="vsRepeatContainer"in n?U.element(t[0].querySelector(n.vsRepeatContainer)):t,r=e.children(),o=r.eq(0),L=o[0].outerHTML,q="$vs_collection";["vsSize","vsScrollParent","vsSizeProperty","vsHorizontal","vsOffsetBefore","vsOffsetAfter","vsScrolledToEndOffset","vsScrolledToBeginningOffset","vsExcess","vsScrollMargin"].forEach(function(e){e in n&&c(e,t)});var a=_slicedToArray(function(e){for(var t=["ng-repeat","data-ng-repeat","ng-repeat-start","data-ng-repeat-start"],n=0;n<t.length;n++){var r=t[n];if(e.attr(r))return[r,e.attr(r),0<=r.indexOf("-start")]}throw new Error("angular-vs-repeat: no ng-repeat directive on a child element")}(o),3),H=a[0],s=a[1],W=a[2],i=_slicedToArray(/^\s*(\S+)\s+in\s+([\S\s]+?)(track\s+by\s+\S+)?$/.exec(s),4),j=i[1],N=i[2],D=i[3];if(W)for(var l=0,d=r.eq(l);null==d.attr("ng-repeat-end")&&null==d.attr("data-ng-repeat-end");)l++,d=r.eq(l),L+=d[0].outerHTML;return e.empty(),{pre:function(g,m,e){var t;function n(e){if("number"==typeof e.size)e.getSize=function(){return e.size};else{var t=J(String(e.size));e.getSize=function(e){return t(g,_defineProperty({},j,e))}}}g.vsRepeat={options:_extends({},Q,null!==(t=g.$eval(e.vsRepeat))&&void 0!==t?t:{})};var R=g.vsRepeat.options;n(R);var x,z=U.isDefined(e.vsRepeatContainer)?U.element(m[0].querySelector(e.vsRepeatContainer)):m,r=U.element(L),o=r[0].tagName.toLowerCase(),y=[],$=U.element("<"+o+' class="vs-repeat-before-content"></'+o+">"),b=U.element("<"+o+' class="vs-repeat-after-content"></'+o+">"),I=null===R.size,w=R.scrollParent?"window"===R.scrollParent?U.element(Y):X.call(z,R.scrollParent):z,S=R.horizontal?"clientWidth":"clientHeight",a=R.horizontal?"offsetWidth":"offsetHeight",T=R.horizontal?"scrollWidth":"scrollHeight",A=R.horizontal?"scrollLeft":"scrollTop";if((g.vsRepeat.totalSize=0)===w.length)throw"Specified scroll parent selector did not match any element";if(g.vsRepeat.$scrollParent=w,g.vsRepeat.sizesCumulative=[],R.debug){var s="window"===R.scrollParent?U.element(document.body):w,i=U.element('<div class="vs-repeat-debug-element"></div>');i.css("position","window"===R.scrollParent?"fixed":"absolute"),s.append(i),g.$on("$destroy",function(){i.remove()})}var C,O,M,_,l,d=K(w[0],S)||50;function c(){!y||y.length<1?(g[q]=[],x=0,g.vsRepeat.sizesCumulative=[0]):(x=y.length,R.size?u():p()),h()}function u(){var n=0<arguments.length&&void 0!==arguments[0]?arguments[0]:null,e=y.map(function(e){var t;return null!==(t=n)&&void 0!==t?t:R.getSize(e)}),t=0;g.vsRepeat.sizesCumulative=[0].concat(_toConsumableArray(e.map(function(e){return t+=e})))}function p(){I?g.$$postDigest(function(){if(z[0].offsetHeight||z[0].offsetWidth){for(var e=z.children(),t=0,n=!1,r=!1;t<e.length;){if(null!=e[t].attributes[H]||r){if(n||(d=0),n=!0,e[t][a]&&(d+=e[t][a]),!W)break;if(null!=e[t].attributes["ng-repeat-end"]||null!=e[t].attributes["data-ng-repeat-end"])break;r=!0}t++}n&&(u(d),h(),I=!1,g.$root&&!g.$root.$$phase&&g.$digest())}else var o=g.$watch(function(){(z[0].offsetHeight||z[0].offsetWidth)&&(o(),p())})}):u(d)}function B(n){var r=R.horizontal?"width":"height";return["","min-","max-"].reduce(function(e,t){return e["".concat(t).concat(r)]=n,e},{})}function v(){var e=w[0][A];k()&&(g.$digest(),R._ensureScrollIntegrity&&(w[0][A]=e))}function f(){R.autoresize&&(I=!0,p(),g.$root&&!g.$root.$$phase&&g.$digest()),k()&&g.$digest()}function h(){var e;O=C=void 0,M=x,_=0,e=g.vsRepeat.sizesCumulative[x],g.vsRepeat.totalSize=R.offsetBefore+e+R.offsetAfter,k(),g.$emit("vsRepeatReinitialized",g.vsRepeat.startIndex,g.vsRepeat.endIndex)}function E(){var e=K(w[0],S);e!==l&&(h(),g.$root&&!g.$root.$$phase&&g.$digest()),l=e}function P(e,t){var n=2<arguments.length&&void 0!==arguments[2]?arguments[2]:0,r=3<arguments.length&&void 0!==arguments[3]?arguments[3]:e.length-1,o=4<arguments.length&&void 0!==arguments[4]?arguments[4]:1;if(e[n]===t)return[n,n,o];if(e[r]===t)return[r,r,o];if(1<r-n){var a=Math.floor((n+r)/2);return e[a]>t?P(e,t,n,a,o+1):P(e,t,a,r,o+1)}return[t>e[r]?r:n,t<e[n]?n:r,o]}function k(){var e,t,n=(e=w[0],t=A,e===Y?G()[t]:e[t]),r=K(w[0],S);R.debug&&(r/=2);var o,a,s,i=z[0]===w[0]?0:(o=z[0],a=w[0],s=R.horizontal,o.getBoundingClientRect()[s?"left":"top"]-(a===Y?0:a.getBoundingClientRect()[s?"left":"top"])+(a===Y?G():a)[s?"scrollLeft":"scrollTop"]),l=g.vsRepeat.startIndex,d=g.vsRepeat.endIndex;if(I&&!R.size)l=0,d=1;else{g.$$postDigest(function(){Y.requestAnimationFrame(function(){var e=g.vsRepeat.sizesCumulative[x],n=Y.getComputedStyle(z[0]),t=R.horizontal?["paddingLeft","paddingRight"]:["paddingTop","paddingBottom"],r=z[0][T]-t.reduce(function(e,t){return e+Number(n[t].slice(0,-2))},0);z[0][T]&&e!==r&&console.warn("vsRepeat: size mismatch. Expected size "+e+"px whereas actual size is "+r+"px. Fix vsSize on element:",m[0])})});var c=n-R.offsetBefore-i;l=_slicedToArray(P(g.vsRepeat.sizesCumulative,c-R.scrollMargin),1)[0],l=Math.max(l,0),d=_slicedToArray(P(g.vsRepeat.sizesCumulative,c+R.scrollMargin+r,l),2)[1],d=Math.min(d,x)}M=Math.min(l,M),_=Math.max(d,_),g.vsRepeat.startIndex=R.latch?M:l,g.vsRepeat.endIndex=R.latch?_:d,_<g.vsRepeat.startIndex&&(g.vsRepeat.startIndex=_);var u=!1;if(null==C?u=!0:null==O&&(u=!0),u||(R.hunked?Math.abs(g.vsRepeat.startIndex-C)>=R.hunkSize||0===g.vsRepeat.startIndex&&0!==C?u=!0:(Math.abs(g.vsRepeat.endIndex-O)>=R.hunkSize||g.vsRepeat.endIndex===x&&O!==x)&&(u=!0):u=g.vsRepeat.startIndex!==C||g.vsRepeat.endIndex!==O),u){var p;g[q]=y.slice(g.vsRepeat.startIndex,g.vsRepeat.endIndex),g.$emit("vsRepeatInnerCollectionUpdated",g.vsRepeat.startIndex,g.vsRepeat.endIndex,C,O),R.scrolledToEnd&&(p=y.length-R.scrolledToEndOffset,(g.vsRepeat.endIndex>=p&&O<p||y.length&&g.vsRepeat.endIndex===y.length)&&g.$eval(R.scrolledToEnd)),R.scrolledToBeginning&&(p=R.scrolledToBeginningOffset,g.vsRepeat.startIndex<=p&&C>g.vsRepeat.startIndex&&g.$eval(R.scrolledToBeginning)),C=g.vsRepeat.startIndex,O=g.vsRepeat.endIndex;var v=g.vsRepeat.sizesCumulative[g.vsRepeat.startIndex]+R.offsetBefore,f=g.vsRepeat.sizesCumulative[g.vsRepeat.startIndex+g[q].length]+R.offsetBefore,h=g.vsRepeat.totalSize;$.css(B(v+"px")),b.css(B(h-f+"px"))}return u}R.horizontal?($.css("height","100%"),b.css("height","100%")):($.css("width","100%"),b.css("width","100%")),e.vsRepeatOptions&&g.$watchCollection(e.vsRepeatOptions,function(e){var t=_extends({},R,e);JSON.stringify(t)!==JSON.stringify(R)&&(Object.assign(R,e),n(R),h())}),g.$watchCollection(N,function(){var e=0<arguments.length&&void 0!==arguments[0]?arguments[0]:[];y=e,c()}),r.eq(0).attr(H,j+" in "+q+(D?" "+D:"")),r.addClass("vs-repeat-repeated-element"),z.append($),z.append(r),F(r)(g),z.append(b),g.vsRepeat.startIndex=0,g.vsRepeat.endIndex=0,w.on("scroll",v),U.element(Y).on("resize",f),g.$on("$destroy",function(){U.element(Y).off("resize",f),w.off("scroll",v)}),g.$on("vsRepeatTrigger",c),g.$on("vsRepeatResize",function(){I=!0,p()}),g.$on("vsRenderAll",function(){R.latch&&(g.vsRepeat.endIndex!==x?setTimeout(function(){var e=x;_=Math.max(e,_),g.vsRepeat.endIndex=R.latch?_:e,g[q]=y.slice(g.vsRepeat.startIndex,g.vsRepeat.endIndex),O=g.vsRepeat.endIndex,$.css(B(0)),b.css(B(0)),g.$emit("vsRenderAllDone"),g.$root&&!g.$root.$$phase&&g.$digest()}):g.$emit("vsRenderAllDone"))}),g.$watch(function(){"function"==typeof Y.requestAnimationFrame?Y.requestAnimationFrame(E):E()})}}}}}]);U.element(document.head).append('<style id="angular-vs-repeat-style">\n\t  \t.vs-repeat-debug-element {\n        top: 50%;\n        left: 0;\n        right: 0;\n        height: 1px;\n        background: red;\n        z-index: 99999999;\n        box-shadow: 0 0 20px red;\n      }\n\n      .vs-repeat-debug-element + .vs-repeat-debug-element {\n        display: none;\n      }\n\n      .vs-repeat-before-content,\n      .vs-repeat-after-content {\n        border: none !important;\n        padding: 0 !important;\n      }\n    </style>'),"undefined"!=typeof module&&module.exports&&(module.exports=e.name)}(window,window.angular);
 
 /***/ }),
-/* 38 */
+/* 40 */
 /***/ (function(module, exports, __webpack_require__) {
 
 	module.exports = __webpack_require__.p + "401d815dc206b8dc1b17cd0e37695975.png";
 
 /***/ }),
-/* 39 */
+/* 41 */
 /***/ (function(module, exports, __webpack_require__) {
 
 	module.exports = __webpack_require__.p + "44a526eed258222515aa21eaffd14a96.png";
 
 /***/ })
 /******/ ]);
-//# sourceMappingURL=app-cc4b3decf0f799a0cab9.js.map
+//# sourceMappingURL=app-62f0e56db8ba48f27197.js.map
