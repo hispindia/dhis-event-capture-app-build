@@ -26212,6 +26212,17 @@
 	                            $scope.optionVisibility[effect.dataElement.id].hidden[effect.option.id] = effect.ineffect;
 	                            if (dataElementOptionsChanged.indexOf(effect.dataElement.id) === -1) dataElementOptionsChanged.push(effect.dataElement.id);
 	                        }
+	                    } else if (effect.action === "HIDEOPTIONGROUP") {
+	                        if (effect.ineffect && effect.dataElement && effect.optionGroup) {
+	                            if (!$scope.optionVisibility[effect.dataElement.id]) $scope.optionVisibility[effect.dataElement.id] = { hidden: {} };
+	                            var optionGroup = $scope.optionGroupsById[effect.optionGroup.id];
+	                            if (optionGroup) {
+	                                angular.extend($scope.optionVisibility[effect.dataElement.id].hidden, optionGroup.optionsById);
+	                                if (dataElementOptionsChanged.indexOf(effect.dataElement.id) === -1) dataElementOptionsChanged.push(effect.dataElement.id);
+	                            } else {
+	                                $log.warn("OptionGroup " + effect.optionGroup.id + " was not found");
+	                            }
+	                        }
 	                    } else if (effect.action === "SHOWOPTIONGROUP") {
 	                        if (effect.ineffect && effect.dataElement && effect.optionGroup) {
 	                            if (!$scope.optionVisibility[effect.dataElement.id]) $scope.optionVisibility[effect.dataElement.id] = { hidden: {} };
@@ -26762,4 +26773,4 @@
 
 /***/ })
 /******/ ]);
-//# sourceMappingURL=app-62f0e56db8ba48f27197.js.map
+//# sourceMappingURL=app-fac2b72bda1a32238e0f.js.map
