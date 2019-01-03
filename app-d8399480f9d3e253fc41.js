@@ -4407,7 +4407,7 @@
 	                        }
 	                        scope.d2FileInputName[scope.d2FileInput.event][de] = data.response.fileResource.name;
 	                        if( update ){
-	                            var updatedSingleValueEvent = {event: scope.d2FileInput.event, dataValues: [{value: data.response.fileResource.id, dataElement:  de}]};
+	                            var updatedSingleValueEvent = {program: scope.d2FileInput.program, event: scope.d2FileInput.event, dataValues: [{value: data.response.fileResource.id, dataElement:  de}]};
 	                            var updatedFullValueEvent = DHIS2EventService.reconstructEvent(scope.d2FileInput, scope.d2FileInputPs.programStageDataElements);
 	                            DHIS2EventFactory.updateForSingleValue(updatedSingleValueEvent, updatedFullValueEvent).then(function(data){
 	                                scope.d2FileInputList = DHIS2EventService.refreshList(scope.d2FileInputList, scope.d2FileInput);
@@ -6615,7 +6615,7 @@
 	.controller('OrgUnitTreeController', function($scope, $modalInstance, OrgUnitFactory, orgUnitId, orgUnitNames) {
 	    
 	    $scope.model = {selectedOrgUnitId: orgUnitId ? orgUnitId : null};
-	    $scope.orgUnitNames = orgUnitNames;
+	    $scope.orgUnitNames = orgUnitNames ? orgUnitNames : {};
 	
 	    function expandOrgUnit( orgUnit, ou ){
 	        if( ou.path.indexOf( orgUnit.path ) !== -1 ){
@@ -25957,4 +25957,4 @@
 
 /***/ })
 /******/ ]);
-//# sourceMappingURL=app-5207d00f7a2aa2e3e5a9.js.map
+//# sourceMappingURL=app-d8399480f9d3e253fc41.js.map
