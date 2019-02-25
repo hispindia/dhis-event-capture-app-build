@@ -24855,7 +24855,7 @@
 	
 	            $scope.emptyFilterText = angular.copy($scope.filterText);
 	
-	            $scope.customDataEntryForm = CustomFormService.getForProgramStage($scope.selectedProgramStage, $scope.prStDes);
+	            $scope.customDataEntryForm = CustomFormService.getForProgramStage($scope.selectedProgramStage, $scope.prStDes, true);
 	
 	            if ($scope.selectedProgramStage.captureCoordinates) {
 	                $scope.newDhis2Event.coordinate = {};
@@ -26784,4 +26784,4 @@
 
 /***/ })
 /******/ ]);
-//# sourceMappingURL=app-d5b18a943e3a71bfb46c.js.map
+//# sourceMappingURL=app-937195a16d913f0f66c1.js.map
