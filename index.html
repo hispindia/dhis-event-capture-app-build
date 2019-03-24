@@ -20,7 +20,7 @@
         <link type="text/css" rel="stylesheet" media="screen" href="../dhis-web-core-resource/angular.ui-select/0.12.0/select.min.css" />
         <link type="text/css" rel="stylesheet" media="screen" href="../dhis-web-core-resource/angular-plugins/select2-3c4dc0b207.css" />
 
-        <link type="text/css" rel="stylesheet" href="styles/style.css?_=b17719f5b0234c65260a" media="screen" />
+        <link type="text/css" rel="stylesheet" href="styles/style.css?_=e342b60781bea83b78b0" media="screen" />
 
         <link type="text/css" rel="stylesheet" href="../api/files/style" />
 
@@ -110,10 +110,10 @@
             jQuery(function () {
                 Dhis2HeaderBar.initHeaderBar(document.querySelector('#header'), '../api', { noLoadingIndicator: true });
             });
+            var downloadMetaData, ajax_login, DHIS2URL; // included core/event-capture.js in bundle, but these variables needs to be global for time being. They are set in index.js
         </script>
 
-        <script src="core/event-capture.js?_=b17719f5b0234c65260a"></script>
-<script src="../main.js?_=b17719f5b0234c65260a"></script>
+        <script src="../main.js?_=e342b60781bea83b78b0"></script>
 
         <script type="text/javascript" src="../api/files/script"></script>
 
@@ -125,5 +125,5 @@
 
         <div ng-view></div>
 
-    <script type="text/javascript" src="app-b17719f5b0234c65260a.js"></script></body>
+    <script type="text/javascript" src="app-e342b60781bea83b78b0.js"></script></body>
 </html>
