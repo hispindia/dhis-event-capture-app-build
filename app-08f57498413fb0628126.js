@@ -1736,21 +1736,23 @@
 	                                                            <a href ng-click="downloadFile(null, \'' + fieldId + '\', null)" ng-attr-title="fileNames[currentEvent.event][' + fieldId + ']" >{{fileNames[currentEvent.event][' + fieldId + '].length > 20 ? fileNames[currentEvent.event][' + fieldId + '].substring(0,20).concat(\'...\') : fileNames[currentEvent.event][' + fieldId + ']}}</a>\n\
 	                                                        </span>\n\
 	                                                        <span class="input-group-btn">\n\
-	                                                            <span class="btn btn-grp btn-file">\n\
-	                                                                <span ng-if="currentEvent.' + fieldId + '" ng-attr-title="{{\'delete\' | translate}}" d2-file-input-name="fileNames[currentEvent.event][' + fieldId + ']" d2-file-input-delete="currentEvent.' + fieldId + '">\n\
-	                                                                    <a href ng-click="deleteFile(\'' + fieldId + '\')"><i class="fa fa-trash alert-danger"></i></a>\n\
-	                                                                </span>\n\
-	                                                                <span ng-if="!currentEvent.' + fieldId + '" ng-attr-title="{{\'upload\' | translate}}" >\n\
-	                                                                    <i class="fa fa-upload"></i>\n\
-	                                                                    <input  type="file" \n\
-	                                                                            ' + this.getAttributesAsString(attributes) + '\n\
-	                                                                            input-field-id="' + fieldId + '"\n\
-	                                                                            d2-file-input-ps="currentStage"\n\
-	                                                                            d2-file-input="currentEvent"\n\
-	                                                                            d2-file-input-current-name="currentFileNames"\n\
-	                                                                            d2-file-input-name="fileNames">\n\
+	                                                            <span class="btn btn-grp btn-file" ng-click="deleteFile(currentEvent, \'' + fieldId + '\')" ng-if="currentEvent.' + fieldId + '">\n\
+	                                                                <i class="fa fa-trash alert-danger"></i>\n\
+	                                                                <span ng-attr-title="{{\'delete\' | translate}}" d2-file-input-name="fileNames[currentEvent.event][' + fieldId + ']" d2-file-input-delete="currentEvent.' + fieldId + '">\n\
 	                                                                </span>\n\
 	                                                            </span>\n\
+	                                                            <span class="btn btn-grp btn-file" ng-if="!currentEvent.' + fieldId + '"> \n\
+	                                                                <span ng-attr-title="{{\'upload\' | translate}}" >\n\
+	                                                                        <i class="fa fa-upload"></i>\n\
+	                                                                        <input  type="file" \n\
+	                                                                                ' + this.getAttributesAsString(attributes) + '\n\
+	                                                                                input-field-id="' + fieldId + '"\n\
+	                                                                                d2-file-input-ps="currentStage"\n\
+	                                                                                d2-file-input="currentEvent"\n\
+	                                                                                d2-file-input-current-name="currentFileNames"\n\
+	                                                                                d2-file-input-name="fileNames">\n\
+	                                                                </span>\n\
+	                                                            </span> \n\
 	                                                        </span>\n\
 	                                                    </span>' 
 	                                                    '<span class="not-for-screen">' +
@@ -2666,7 +2668,7 @@
 	        processedValue = $filter('trimquotes')(processedValue);
 	
 	        //Append single quotation marks in case the variable is of text or date type:
-	        if(valueType === 'LONG_TEXT' || valueType === 'TEXT' || valueType === 'DATE' || valueType === 'OPTION_SET' ||
+	        if(valueType === 'LONG_TEXT' || valueType === 'TEXT' || valueType === 'DATE' || valueType === 'AGE' || valueType === 'OPTION_SET' ||
 	            valueType === 'URL' || valueType === 'DATETIME' || valueType === 'TIME' || valueType === 'PHONE_NUMBER' || 
 	            valueType === 'ORGANISATION_UNIT' || valueType === 'USERNAME') {
 	            if(processedValue) {
@@ -6981,10 +6983,8 @@
 	        link: function(scope, element, attrs, ngModel) {            
 	            
 	            function uniqunessValidatior(attributeData){
-	                
-	                ngModel.$asyncValidators.uniqunessValidator = function (modelValue, viewValue) {
-	                    var pager = {pageSize: 1, page: 1, toolBarDisplay: 5};
-	                    var deferred = $q.defer(), currentValue = modelValue || viewValue, programOrTetUrl = null, ouMode = 'ACCESSIBLE';
+	                element.on('blur', function() {
+	                    var deferred = $q.defer(), currentValue = ngModel.$modelValue, programOrTetUrl = null, ouMode = 'ACCESSIBLE';
 	                    
 	                    if (currentValue) {
 	                        
@@ -7002,27 +7002,27 @@
 	                            ouMode = 'SELECTED';
 	                        }                        
 	
-	                        TEIService.search(ouId, ouMode, null, programOrTetUrl, attUrl, pager, true).then(function(data) {
+	                        TEIService.search(ouId, ouMode, null, programOrTetUrl, attUrl, null, false).then(function(data) {
 	                            if(attrs.selectedTeiId){
 	                                if(data && data.rows && data.rows.length && data.rows[0] && data.rows[0].length && data.rows[0][0] !== attrs.selectedTeiId){
-	                                    deferred.reject();
+	                                    ngModel.$setValidity('uniqunessValidator', false);
+	                                    return;
 	                                }
 	                            }
 	                            else{
 	                                if (data.rows.length > 0) {    
-	                                    deferred.reject();
+	                                    ngModel.$setValidity('uniqunessValidator', false);
+	                                    return 
+	                                    ;
 	                                }
 	                            }                            
-	                            deferred.resolve();
+	                            ngModel.$setValidity('uniqunessValidator', true);
+	                        }).catch(function(){
+	                            ngModel.$setValidity('uniqunessValidator', false);
 	                        });
 	                    }
-	                    else {
-	                        deferred.resolve();
-	                    }
-	
-	                    return deferred.promise;
-	                };
-	            }                      
+	                });
+	            }                    
 	            
 	            scope.$watch(attrs.ngDisabled, function(value){
 	                var attributeData = scope.$eval(attrs.attributeData);
@@ -26227,7 +26227,7 @@
 	                eventDate: DateUtils.formatFromUserToApi($scope.currentEvent.eventDate),
 	                event: $scope.currentEvent.event,
 	                dataValues: dataValues,
-	                geometry: $scope.currentEvent.geometry
+	                geometry: $scope.currentEvent.geometry === '' ? undefined : $scope.currentEvent.geometry
 	            };
 	
 	            if (!angular.isUndefined($scope.note.value) && $scope.note.value !== '') {
@@ -27047,8 +27047,7 @@
 	        }
 	    };
 	
-	    $scope.deleteFile = function (event, dataElement) {
-	
+	    $scope.deleteFileFromGrid = function (event, dataElement) {
 	        if (!dataElement) {
 	            var dialogOptions = {
 	                headerText: 'error',
@@ -27069,6 +27068,30 @@
 	            delete $scope.fileNames[$scope.currentEvent.event][dataElement];
 	            $scope.currentEvent[dataElement] = null;
 	            $scope.updateEventDataValue(dataElement, $scope.currentEvent);
+	        });
+	    };
+	
+	    $scope.deleteFile = function (event, dataElement) {
+	        if (!dataElement) {
+	            var dialogOptions = {
+	                headerText: 'error',
+	                bodyText: 'missing_file_identifier'
+	            };
+	            DialogService.showDialog({}, dialogOptions);
+	            return;
+	        }
+	
+	        var modalOptions = {
+	            closeButtonText: 'cancel',
+	            actionButtonText: 'remove',
+	            headerText: 'remove',
+	            bodyText: 'are_you_sure_to_remove'
+	        };
+	
+	        ModalService.showModal({}, modalOptions).then(function (result) {
+	            delete $scope.fileNames[$scope.currentEvent.event][dataElement];
+	            $scope.currentEvent[dataElement] = null;
+	            $scope.executeRules();
 	        });
 	    };
 	
@@ -27439,4 +27462,4 @@
 
 /***/ })
 /******/ ]);
-//# sourceMappingURL=app-e342b60781bea83b78b0.js.map
+//# sourceMappingURL=app-08f57498413fb0628126.js.map
