@@ -1,0 +1,6 @@
+{
+  "name": "event-capture-app",
+  "description": "DHIS2 event capture app",
+  "license": "BSD-3-Clause",
+  "version": "30.0.34"
+}
